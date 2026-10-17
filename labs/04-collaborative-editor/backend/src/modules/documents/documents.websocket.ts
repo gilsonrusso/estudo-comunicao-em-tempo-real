@@ -118,13 +118,19 @@ export const documentsWebSocketPlugin: FastifyPluginAsync = async (fastify) => {
             break;
           }
 
-          // Atualização de posição de cursor para presença visual
+          // Atualização de posição de cursor para presença visual com isolamento por arquivo
           case 'CURSOR_MOVE': {
             broadcastToRoom(
               documentId,
               {
                 type: 'CURSOR_UPDATE',
-                user: { userId, userName, color, position: message.position },
+                user: {
+                  userId,
+                  userName,
+                  color,
+                  position: message.position,
+                  file: message.file || 'main.tex',
+                },
               },
               socket
             );

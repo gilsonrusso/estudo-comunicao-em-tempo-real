@@ -20,13 +20,15 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
 import { CollaboratorsBar } from './CollaboratorsBar';
-import { Collaborator, SaveStatus } from '../types/collab';
+import { Collaborator, RemoteCursor, SaveStatus } from '../types/collab';
 
 export interface IdeNavbarProps {
   projectTitle: string;
   userName: string;
   userId: string;
   collaborators: Collaborator[];
+  remoteCursors?: Map<string, RemoteCursor>;
+  activeFile?: string;
   saveStatus: SaveStatus;
   lastSavedAt: string | null;
   layoutMode: 'split' | 'editor' | 'pdf';
@@ -45,6 +47,8 @@ export function IdeNavbar({
   userName,
   userId,
   collaborators,
+  remoteCursors,
+  activeFile,
   saveStatus,
   lastSavedAt,
   layoutMode,
@@ -454,7 +458,12 @@ export function IdeNavbar({
         </Stack>
 
         {/* Pilha de Avatares dos Colaboradores */}
-        <CollaboratorsBar collaborators={collaborators} currentUserId={userId} />
+        <CollaboratorsBar
+          collaborators={collaborators}
+          currentUserId={userId}
+          remoteCursors={remoteCursors}
+          activeFile={activeFile}
+        />
 
         {/* Botão Primário Verde "Share" (Marca do Overleaf) */}
         <Button

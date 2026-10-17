@@ -1,4 +1,4 @@
-import { Collaborator } from '../types/collab.js';
+import { Collaborator, RemoteCursor } from '../types/collab.js';
 import { Users } from 'lucide-react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -9,6 +9,8 @@ import Avatar from '@mui/material/Avatar';
 export interface CollaboratorsBarProps {
   collaborators: Collaborator[];
   currentUserId: string;
+  remoteCursors?: Map<string, RemoteCursor>;
+  activeFile?: string;
 }
 
 function getInitials(name: string): string {
@@ -22,6 +24,8 @@ function getInitials(name: string): string {
 export function CollaboratorsBar({
   collaborators,
   currentUserId,
+  remoteCursors,
+  activeFile = 'main.tex',
 }: CollaboratorsBarProps) {
   return (
     <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
@@ -47,10 +51,12 @@ export function CollaboratorsBar({
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         {collaborators.map((c, idx) => {
           const isMe = c.userId === currentUserId;
+          const remoteCursor = remoteCursors?.get(c.userId);
+          const currentFile = isMe ? activeFile : (remoteCursor?.file || 'main.tex');
           return (
             <Tooltip
               key={c.userId}
-              title={`${c.userName}${isMe ? ' (Você)' : ''}`}
+              title={`${c.userName}${isMe ? ' (Você)' : ''} • em ${currentFile}`}
               arrow
             >
               <Avatar

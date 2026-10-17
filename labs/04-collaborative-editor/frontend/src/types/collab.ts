@@ -3,6 +3,7 @@ export interface Collaborator {
   userName: string;
   color: string;
   position?: number;
+  file?: string;
 }
 
 export interface RemoteCursor {
@@ -11,6 +12,7 @@ export interface RemoteCursor {
   color: string;
   position: number;
   lastActive: number;
+  file?: string;
 }
 
 export interface AuthorHighlight {

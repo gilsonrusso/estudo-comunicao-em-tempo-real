@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useColorMode } from './theme/index';
@@ -166,6 +166,7 @@ export function App() {
                   userName: msg.user.userName,
                   color: msg.user.color,
                   position: msg.user.position,
+                  file: msg.user.file || 'main.tex',
                   lastActive: Date.now(),
                 });
                 return map;
@@ -204,6 +205,7 @@ export function App() {
                   userName: msg.author.userName,
                   color: msg.author.color,
                   position: newPos,
+                  file: 'main.tex',
                   lastActive: Date.now(),
                 });
                 return map;
@@ -337,10 +339,24 @@ export function App() {
         JSON.stringify({
           type: 'CURSOR_MOVE',
           position,
+          file: activeFile,
         })
       );
     }
   };
+
+  // Notifica os colaboradores imediatamente quando alternamos de aba/arquivo ativo
+  useEffect(() => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({
+          type: 'CURSOR_MOVE',
+          position: 0,
+          file: activeFile,
+        })
+      );
+    }
+  }, [activeFile]);
 
   // Disparar compilação de PDF no micro-serviço TeX Live
   const handleRecompile = async () => {
@@ -518,6 +534,13 @@ export function App() {
       ? (saveStatus === 'synced' ? 'synced' : 'saving')
       : (secondarySaveStatus[activeFile] || 'synced');
 
+  // Filtra cursores remotos para exibir APENAS os colaboradores que estão no mesmo arquivo ativo
+  const activeFileRemoteCursors = useMemo(() => {
+    return Array.from(remoteCursors.values()).filter(
+      (c) => (c.file || 'main.tex') === activeFile
+    );
+  }, [remoteCursors, activeFile]);
+
   return (
     <Box
       id="ide-root"
@@ -536,6 +559,8 @@ export function App() {
         userName={userName}
         userId={userId}
         collaborators={collaborators}
+        remoteCursors={remoteCursors}
+        activeFile={activeFile}
         saveStatus={saveStatus}
         lastSavedAt={lastSavedAt}
         layoutMode={layoutMode}
@@ -626,7 +651,7 @@ export function App() {
                   version={documentData.version}
                   saveStatus={isMainFile ? saveStatus : (secondarySaveStatus[activeFile] === 'saving' ? 'saving' : 'synced')}
                   lastSavedAt={lastSavedAt}
-                  remoteCursors={isMainFile ? Array.from(remoteCursors.values()) : []}
+                  remoteCursors={activeFileRemoteCursors}
                   authorHighlights={isMainFile ? authorHighlights : []}
                   activeEditor={isMainFile ? activeEditor : null}
                   theme={themeMode}
