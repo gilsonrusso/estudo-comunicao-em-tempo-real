@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { EditorState, StateField, StateEffect, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { EditorView, lineNumbers, keymap, Decoration, DecorationSet, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -7,7 +7,7 @@ import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { AuthorHighlight, DeltaOperation, RemoteCursor, SaveStatus } from '../types/collab.js';
 import { CheckCircle2, Clock, CloudUpload, UserCheck, Trash2, Code2 } from 'lucide-react';
 
-interface Props {
+export interface CodeMirrorEditorProps {
   content: string;
   version: number;
   saveStatus: SaveStatus;
@@ -225,7 +225,7 @@ const codeMirrorLightTheme = EditorView.theme({
   },
 });
 
-export const CodeMirrorEditor: React.FC<Props> = ({
+export function CodeMirrorEditor({
   content,
   version,
   saveStatus,
@@ -237,7 +237,7 @@ export const CodeMirrorEditor: React.FC<Props> = ({
   onApplyLocalDelta,
   onCursorMove,
   onClearHighlights,
-}) => {
+}: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isRemoteChangeRef = useRef<boolean>(false);

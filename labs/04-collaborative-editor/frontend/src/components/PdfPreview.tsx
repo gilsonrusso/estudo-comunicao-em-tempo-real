@@ -1,7 +1,6 @@
-import React from 'react';
 import { RefreshCw, ExternalLink, AlertTriangle, FileCheck, Download } from 'lucide-react';
 
-interface Props {
+export interface PdfPreviewProps {
   pdfBlobUrl: string | null;
   isCompiling: boolean;
   compileError: string | null;
@@ -9,13 +8,13 @@ interface Props {
   onRecompile: () => void;
 }
 
-export const PdfPreview: React.FC<Props> = ({
+export function PdfPreview({
   pdfBlobUrl,
   isCompiling,
   compileError,
   lastCompiledAt,
   onRecompile,
-}) => {
+}: PdfPreviewProps) {
   return (
     <div
       style={{

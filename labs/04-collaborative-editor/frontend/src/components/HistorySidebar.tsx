@@ -1,8 +1,7 @@
-import React from 'react';
 import { DeltaOperation, DocumentSnapshot } from '../types/collab.js';
 import { History, Database, Cpu, HardDriveDownload } from 'lucide-react';
 
-interface Props {
+export interface HistorySidebarProps {
   documentId: string;
   operations: DeltaOperation[];
   snapshots: DocumentSnapshot[];
@@ -10,12 +9,12 @@ interface Props {
   isFlushing: boolean;
 }
 
-export const HistorySidebar: React.FC<Props> = ({
+export function HistorySidebar({
   operations,
   snapshots,
   onManualFlush,
   isFlushing,
-}) => {
+}: HistorySidebarProps) {
   return (
     <aside
       style={{

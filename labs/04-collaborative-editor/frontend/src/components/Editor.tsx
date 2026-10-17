@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { AuthorHighlight, DeltaOperation, RemoteCursor, SaveStatus } from '../types/collab.js';
 import { CheckCircle2, Clock, CloudUpload, UserCheck, Eye, Edit3, Trash2 } from 'lucide-react';
 
-interface Props {
+export interface EditorProps {
   content: string;
   version: number;
   saveStatus: SaveStatus;
@@ -20,7 +20,7 @@ interface CursorCoord {
   top: number;
 }
 
-export const Editor: React.FC<Props> = ({
+export function Editor({
   content,
   version,
   saveStatus,
@@ -31,7 +31,7 @@ export const Editor: React.FC<Props> = ({
   onApplyLocalDelta,
   onCursorMove,
   onClearHighlights,
-}) => {
+}: EditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
