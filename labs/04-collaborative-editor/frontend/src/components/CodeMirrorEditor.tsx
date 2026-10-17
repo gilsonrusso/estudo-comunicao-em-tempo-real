@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { EditorState, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
+import { EditorState, StateField, StateEffect, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { EditorView, lineNumbers, keymap, Decoration, DecorationSet, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
@@ -15,6 +15,7 @@ interface Props {
   remoteCursors: RemoteCursor[];
   authorHighlights: AuthorHighlight[];
   activeEditor: { userName: string; color: string; action: string } | null;
+  theme?: 'dark' | 'light';
   onApplyLocalDelta: (delta: Omit<DeltaOperation, 'userId' | 'userName' | 'timestamp'>) => void;
   onCursorMove: (position: number) => void;
   onClearHighlights: () => void;
@@ -49,15 +50,16 @@ class CursorWidget extends WidgetType {
     flag.style.bottom = '100%';
     flag.style.left = '0';
     flag.style.backgroundColor = this.color;
-    flag.style.color = '#0b0f19';
+    flag.style.color = '#ffffff';
     flag.style.fontSize = '10px';
-    flag.style.fontWeight = 'bold';
+    flag.style.fontWeight = '600';
     flag.style.padding = '1px 5px';
     flag.style.borderRadius = '3px 3px 3px 0';
     flag.style.whiteSpace = 'nowrap';
     flag.style.pointerEvents = 'none';
     flag.style.zIndex = '20';
     flag.style.transform = 'translateY(-2px)';
+    flag.style.boxShadow = '0 1px 3px rgba(0,0,0,0.25)';
 
     wrap.appendChild(bar);
     wrap.appendChild(flag);
@@ -84,7 +86,6 @@ const remoteCursorsField = StateField.define<DecorationSet>({
         const builder = new RangeSetBuilder<Decoration>();
         const docLen = tr.newDoc.length;
 
-        // Ordena por posição para a API RangeSet
         const sorted = [...effect.value]
           .filter((c) => c.position >= 0 && c.position <= docLen)
           .sort((a, b) => a.position - b.position);
@@ -127,7 +128,7 @@ const authorHighlightsField = StateField.define<DecorationSet>({
           if (to > from) {
             const markDeco = Decoration.mark({
               attributes: {
-                style: `background-color: ${h.color}35; border-bottom: 2px solid ${h.color}; border-radius: 2px;`,
+                style: `background-color: ${h.color}30; border-bottom: 2px solid ${h.color}; border-radius: 2px;`,
                 title: `Editado por ${h.authorName}`,
               },
             });
@@ -143,17 +144,20 @@ const authorHighlightsField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-// Tema escuro com fontes de código para LaTeX
+// Compartment para alternar temas no CodeMirror sem reinstanciar
+const themeCompart = new Compartment();
+
+// Tema Escuro Oficial Overleaf
 const codeMirrorDarkTheme = EditorView.theme({
   '&': {
-    backgroundColor: '#0b0f19',
-    color: '#e2e8f0',
+    backgroundColor: 'var(--bg-editor)',
+    color: '#f4f5f6',
     fontSize: '13.5px',
     height: '100%',
-    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+    fontFamily: "var(--font-mono)",
   },
   '.cm-content': {
-    caretColor: '#38bdf8',
+    caretColor: '#098842',
     padding: '12px 0',
   },
   '.cm-line': {
@@ -161,23 +165,63 @@ const codeMirrorDarkTheme = EditorView.theme({
     lineHeight: '1.65',
   },
   '.cm-gutters': {
-    backgroundColor: '#0a0d14',
-    color: '#475569',
-    borderRight: '1px solid #1e293b',
+    backgroundColor: 'var(--bg-gutter)',
+    color: '#8d96a5',
+    borderRight: '1px solid var(--border)',
   },
   '&.cm-focused .cm-cursor': {
-    borderLeftColor: '#38bdf8',
+    borderLeftColor: '#098842',
     borderLeftWidth: '2px',
   },
   '&.cm-focused .cm-selectionBackground, ::selection': {
-    backgroundColor: 'rgba(56, 189, 248, 0.25) !important',
+    backgroundColor: 'rgba(54, 108, 191, 0.35) !important',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    color: '#94a3b8',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    color: '#f4f5f6',
+    fontWeight: 'bold',
+  },
+});
+
+// Tema Claro Oficial Overleaf
+const codeMirrorLightTheme = EditorView.theme({
+  '&': {
+    backgroundColor: '#ffffff',
+    color: '#1b222c',
+    fontSize: '13.5px',
+    height: '100%',
+    fontFamily: "var(--font-mono)",
+  },
+  '.cm-content': {
+    caretColor: '#098842',
+    padding: '12px 0',
+  },
+  '.cm-line': {
+    padding: '0 12px',
+    lineHeight: '1.65',
+  },
+  '.cm-gutters': {
+    backgroundColor: '#fafafb',
+    color: '#677283',
+    borderRight: '1px solid #e7e9ee',
+  },
+  '&.cm-focused .cm-cursor': {
+    borderLeftColor: '#098842',
+    borderLeftWidth: '2px',
+  },
+  '&.cm-focused .cm-selectionBackground, ::selection': {
+    backgroundColor: 'rgba(151, 182, 229, 0.4) !important',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'rgba(0, 0, 0, 0.035)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    color: '#1b222c',
+    fontWeight: 'bold',
   },
 });
 
@@ -189,6 +233,7 @@ export const CodeMirrorEditor: React.FC<Props> = ({
   remoteCursors,
   authorHighlights,
   activeEditor,
+  theme = 'dark',
   onApplyLocalDelta,
   onCursorMove,
   onClearHighlights,
@@ -211,14 +256,12 @@ export const CodeMirrorEditor: React.FC<Props> = ({
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         remoteCursorsField,
         authorHighlightsField,
-        codeMirrorDarkTheme,
+        themeCompart.of(theme === 'light' ? codeMirrorLightTheme : codeMirrorDarkTheme),
         EditorView.updateListener.of((update) => {
-          // Captura movimentos de cursor local
           if (update.selectionSet && !isRemoteChangeRef.current) {
             onCursorMove(update.state.selection.main.head);
           }
 
-          // Captura edições do usuário local e extrai deltas atômicos
           if (update.docChanged && !isRemoteChangeRef.current) {
             update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
               const insertedText = inserted.toString();
@@ -254,53 +297,67 @@ export const CodeMirrorEditor: React.FC<Props> = ({
 
     return () => {
       view.destroy();
+      viewRef.current = null;
     };
   }, []);
 
-  // Sincroniza o conteúdo quando chega delta remoto sem sobrescrever o cursor
+  // Reconfigura o tema do CodeMirror dinamicamente quando a prop `theme` mudar
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    const currentDoc = view.state.doc.toString();
-    if (currentDoc !== content) {
-      isRemoteChangeRef.current = true;
-      try {
-        view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: content },
-        });
-      } finally {
-        isRemoteChangeRef.current = false;
-      }
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: themeCompart.reconfigure(theme === 'light' ? codeMirrorLightTheme : codeMirrorDarkTheme),
+      });
     }
-  }, [content]);
+  }, [theme]);
 
-  // Atualiza cursores remotos no CodeMirror
+  // Atualiza cursores remotos
   useEffect(() => {
-    const view = viewRef.current;
-    if (view) {
-      view.dispatch({
+    if (viewRef.current) {
+      viewRef.current.dispatch({
         effects: setRemoteCursorsEffect.of(remoteCursors),
       });
     }
   }, [remoteCursors]);
 
-  // Atualiza realces de autoria no CodeMirror
+  // Atualiza realces de autoria
   useEffect(() => {
-    const view = viewRef.current;
-    if (view) {
-      view.dispatch({
+    if (viewRef.current) {
+      viewRef.current.dispatch({
         effects: setHighlightsEffect.of(authorHighlights),
       });
     }
   }, [authorHighlights]);
 
+  // Sincroniza conteúdo se o documento for substituído externamente
+  useEffect(() => {
+    if (viewRef.current) {
+      const currentDoc = viewRef.current.state.doc.toString();
+      if (currentDoc !== content) {
+        isRemoteChangeRef.current = true;
+        viewRef.current.dispatch({
+          changes: { from: 0, to: currentDoc.length, insert: content },
+        });
+        isRemoteChangeRef.current = false;
+      }
+    }
+  }, [content]);
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Barra de Status e Ferramentas do CodeMirror */}
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        backgroundColor: 'var(--bg-editor)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Barra de Status e Ferramentas do CodeMirror (Estilo Overleaf) */}
       <div
         style={{
-          padding: '0.6rem 1.25rem',
+          height: '42px',
+          padding: '0 1rem',
           backgroundColor: 'var(--bg-secondary)',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
@@ -309,36 +366,45 @@ export const CodeMirrorEditor: React.FC<Props> = ({
           fontSize: '0.8rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--accent)', fontWeight: 600 }}>
-            <Code2 size={16} />
-            <span>CodeMirror 6 • LaTeX (sTeX)</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              color: 'var(--text-main)',
+              fontWeight: 600,
+              fontSize: '0.78rem',
+            }}
+          >
+            <Code2 size={15} style={{ color: 'var(--accent)' }} />
+            <span>LaTeX (sTeX)</span>
           </div>
 
-          <span style={{ color: 'var(--border)' }}>|</span>
+          <span style={{ color: 'var(--border)' }}>•</span>
 
           {saveStatus === 'synced' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--green)' }}>
-              <CheckCircle2 size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--green-50)', fontSize: '0.75rem', fontWeight: 500 }}>
+              <CheckCircle2 size={13} />
               <span>Sincronizado</span>
             </div>
           )}
 
           {saveStatus === 'pending_debounce' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--yellow)' }}>
-              <Clock size={15} />
-              <span>Buffer Redis (Debounce 3s)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--yellow-40)', fontSize: '0.75rem', fontWeight: 500 }}>
+              <Clock size={13} />
+              <span>Buffer Redis (3s)</span>
             </div>
           )}
 
           {saveStatus === 'saving' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--accent)' }}>
-              <CloudUpload size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--blue-50)', fontSize: '0.75rem', fontWeight: 500 }}>
+              <CloudUpload size={13} />
               <span>Gravando snapshot...</span>
             </div>
           )}
 
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.73rem' }}>
             <span style={{ fontWeight: 600 }}>v{version}</span>
             {lastSavedAt && <span> • {lastSavedAt}</span>}
           </div>
@@ -348,17 +414,17 @@ export const CodeMirrorEditor: React.FC<Props> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                gap: '0.35rem',
+                backgroundColor: 'var(--bg-card)',
                 border: `1px solid ${activeEditor.color}`,
-                padding: '0.15rem 0.6rem',
-                borderRadius: '0.35rem',
+                padding: '0.15rem 0.5rem',
+                borderRadius: 'var(--radius-pill)',
                 color: activeEditor.color,
-                fontSize: '0.75rem',
+                fontSize: '0.72rem',
                 fontWeight: 600,
               }}
             >
-              <UserCheck size={13} />
+              <UserCheck size={12} />
               <span>{activeEditor.userName} {activeEditor.action}</span>
             </div>
           )}
@@ -368,18 +434,8 @@ export const CodeMirrorEditor: React.FC<Props> = ({
           <button
             onClick={onClearHighlights}
             title="Limpar realces coloridos da tela"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              padding: '0.25rem 0.5rem',
-              backgroundColor: 'transparent',
-              color: 'var(--text-muted)',
-              border: '1px solid var(--border)',
-              borderRadius: '0.375rem',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-            }}
+            className="btn-overleaf btn-overleaf-ghost"
+            style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
           >
             <Trash2 size={12} />
             <span>Limpar Realces ({authorHighlights.length})</span>

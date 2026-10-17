@@ -19,7 +19,7 @@ export const HistorySidebar: React.FC<Props> = ({
   return (
     <aside
       style={{
-        width: '380px',
+        width: '360px',
         backgroundColor: 'var(--bg-secondary)',
         borderLeft: '1px solid var(--border)',
         display: 'flex',
@@ -31,38 +31,29 @@ export const HistorySidebar: React.FC<Props> = ({
       {/* Header da Sidebar */}
       <div
         style={{
-          padding: '1rem',
+          height: '42px',
+          padding: '0 1rem',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          backgroundColor: 'var(--bg-secondary)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <History size={18} color="var(--accent)" />
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Deltas & Persistência</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <History size={16} style={{ color: 'var(--accent)' }} />
+          <h3 style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>Histórico & Deltas</h3>
         </div>
 
         <button
           onClick={onManualFlush}
           disabled={isFlushing}
-          title="Salva um Snapshot no PostgreSQL imediatamente sem aguardar o debounce"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.35rem 0.65rem',
-            backgroundColor: 'var(--bg-card)',
-            color: 'var(--text-main)',
-            border: '1px solid var(--border)',
-            borderRadius: '0.375rem',
-            fontSize: '0.75rem',
-            fontWeight: 500,
-            cursor: isFlushing ? 'not-allowed' : 'pointer',
-          }}
+          title="Salva um Snapshot no PostgreSQL imediatamente"
+          className="btn-overleaf btn-overleaf-secondary"
+          style={{ fontSize: '0.72rem', padding: '0.2rem 0.6rem' }}
         >
-          <HardDriveDownload size={14} color="var(--green)" />
-          <span>{isFlushing ? 'Salvando...' : 'Flush Snapshot'}</span>
+          <HardDriveDownload size={13} style={{ color: 'var(--green-50)' }} />
+          <span>{isFlushing ? 'Gravando...' : 'Flush'}</span>
         </button>
       </div>
 
@@ -70,21 +61,21 @@ export const HistorySidebar: React.FC<Props> = ({
       <div
         style={{
           margin: '0.75rem',
-          padding: '0.75rem',
-          backgroundColor: 'rgba(56, 189, 248, 0.08)',
-          border: '1px solid rgba(56, 189, 248, 0.2)',
-          borderRadius: '0.5rem',
-          fontSize: '0.75rem',
-          lineHeight: '1.4',
-          color: '#bae6fd',
+          padding: '0.65rem 0.75rem',
+          backgroundColor: 'rgba(54, 108, 191, 0.08)',
+          border: '1px solid rgba(54, 108, 191, 0.25)',
+          borderRadius: 'var(--radius-base)',
+          fontSize: '0.73rem',
+          lineHeight: '1.45',
+          color: 'var(--text-main)',
         }}
       >
-        <strong>Como funciona a persistência:</strong>
-        <p style={{ marginTop: '0.25rem' }}>
-          1. Cada tecla gera um <strong>Delta</strong> minúsculo via WebSocket (RAM).
+        <strong style={{ color: 'var(--blue-50)' }}>Arquitetura Overleaf:</strong>
+        <p style={{ marginTop: '0.2rem' }}>
+          1. Cada tecla gera um <strong>Delta</strong> minúsculo via WebSocket (RAM / Redis).
         </p>
         <p>
-          2. Após <strong>3 segundos</strong> sem digitação (debounce), o servidor grava um <strong>Snapshot</strong> consolidado no banco.
+          2. Após <strong>3 segundos</strong> sem digitação (debounce), o servidor consolida o <strong>Snapshot</strong> no banco.
         </p>
       </div>
 
@@ -95,59 +86,61 @@ export const HistorySidebar: React.FC<Props> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '0.4rem',
-            fontSize: '0.75rem',
+            fontSize: '0.72rem',
             textTransform: 'uppercase',
+            letterSpacing: '0.4px',
             color: 'var(--text-muted)',
             fontWeight: 600,
-            marginBottom: '0.5rem',
+            marginBottom: '0.4rem',
           }}
         >
-          <Database size={14} color="var(--purple)" />
-          <span>Snapshots no Banco de Dados ({snapshots.length})</span>
+          <Database size={13} style={{ color: 'var(--blue-40)' }} />
+          <span>Snapshots no Banco ({snapshots.length})</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '160px', overflowY: 'auto' }}>
           {snapshots.map((s) => (
             <div
               key={s.id}
               style={{
                 backgroundColor: 'var(--bg-card)',
                 border: '1px solid var(--border)',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.65rem',
-                fontSize: '0.8rem',
+                borderRadius: 'var(--radius-base)',
+                padding: '0.45rem 0.6rem',
+                fontSize: '0.75rem',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ color: 'var(--purple)' }}>Versão {s.version}</strong>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                <strong style={{ color: 'var(--blue-50)' }}>Versão {s.version}</strong>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                   {new Date(s.createdAt).toLocaleTimeString()}
                 </span>
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Salvo por: <span style={{ color: 'var(--text-main)' }}>{s.savedBy}</span> ({s.reason})
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                Salvo por: <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{s.savedBy}</span> ({s.reason})
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Seção 2: Stream de Operações Atômicas (Deltas em tempo real) */}
+      {/* Seção 2: Stream de Operações Atômicas */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.5rem 0.75rem', overflow: 'hidden' }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.4rem',
-            fontSize: '0.75rem',
+            fontSize: '0.72rem',
             textTransform: 'uppercase',
+            letterSpacing: '0.4px',
             color: 'var(--text-muted)',
             fontWeight: 600,
-            marginBottom: '0.5rem',
+            marginBottom: '0.4rem',
           }}
         >
-          <Cpu size={14} color="var(--accent)" />
-          <span>Stream de Deltas / Operações ({operations.length})</span>
+          <Cpu size={13} style={{ color: 'var(--accent)' }} />
+          <span>Stream de Deltas ({operations.length})</span>
         </div>
 
         <div
@@ -156,11 +149,11 @@ export const HistorySidebar: React.FC<Props> = ({
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column-reverse',
-            gap: '0.35rem',
+            gap: '0.3rem',
           }}
         >
           {operations.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '1rem' }}>
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '1rem' }}>
               Nenhuma alteração recente ainda. Comece a digitar!
             </div>
           ) : (
@@ -169,18 +162,18 @@ export const HistorySidebar: React.FC<Props> = ({
                 key={idx}
                 className="mono"
                 style={{
-                  backgroundColor: 'var(--bg-primary)',
+                  backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border)',
-                  borderRadius: '0.25rem',
-                  padding: '0.4rem 0.5rem',
-                  fontSize: '0.72rem',
+                  borderRadius: 'var(--radius-xs)',
+                  padding: '0.35rem 0.5rem',
+                  fontSize: '0.7rem',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                   <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{op.userName}</span>
                   <span>{new Date(op.timestamp).toLocaleTimeString()}</span>
                 </div>
-                <div style={{ marginTop: '0.2rem', color: op.type === 'insert' ? 'var(--green)' : '#ef4444' }}>
+                <div style={{ marginTop: '0.2rem', color: op.type === 'insert' ? 'var(--green-50)' : 'var(--red-50)' }}>
                   {op.type === 'insert' ? (
                     <span>
                       + INSERT na pos <strong>{op.position}</strong>: "{op.text}"

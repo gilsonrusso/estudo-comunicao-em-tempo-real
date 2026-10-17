@@ -12,7 +12,7 @@ import {
   RemoteCursor,
   SaveStatus,
 } from './types/collab.js';
-import { FileText, Wifi, WifiOff, Columns, Code, FileOutput, History } from 'lucide-react';
+import { FileText, Wifi, WifiOff, Columns, Code, FileOutput, History, Sun, Moon } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3333';
 const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:3333';
@@ -80,6 +80,19 @@ export const App: React.FC = () => {
   const [lastCompiledAt, setLastCompiledAt] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState<'split' | 'editor' | 'pdf'>('split');
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('collab_theme') as 'dark' | 'light') || 'dark';
+  });
+
+  // Aplica tema no elemento raiz do documento
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('collab_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -391,38 +404,58 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      {/* Header Principal */}
+      {/* Header Principal Oficial Overleaf */}
       <header
         style={{
-          height: '56px',
-          padding: '0 1.25rem',
+          height: '48px',
+          padding: '0 1rem',
           backgroundColor: 'var(--bg-secondary)',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '1rem',
+          zIndex: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-          <FileText size={22} color="var(--accent)" style={{ flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+          <FileText size={20} style={{ color: 'var(--accent)', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <h1
+              style={{
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                color: 'var(--text-main)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                lineHeight: 1.2,
+              }}
+            >
               {documentData.title}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span>Overleaf Clone • TeX Live</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.68rem',
+                color: 'var(--text-muted)',
+                marginTop: '1px',
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>Overleaf TeX Live</span>
               <span>•</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                 {isConnected ? (
                   <>
-                    <Wifi size={11} color="var(--green)" />
-                    <span style={{ color: 'var(--green)' }}>Conectado</span>
+                    <Wifi size={10} style={{ color: 'var(--green-50)' }} />
+                    <span style={{ color: 'var(--green-50)', fontWeight: 500 }}>Conectado</span>
                   </>
                 ) : (
                   <>
-                    <WifiOff size={11} color="#ef4444" />
-                    <span style={{ color: '#ef4444' }}>Desconectado</span>
+                    <WifiOff size={10} style={{ color: 'var(--red-50)' }} />
+                    <span style={{ color: 'var(--red-50)', fontWeight: 500 }}>Desconectado</span>
                   </>
                 )}
               </div>
@@ -432,44 +465,30 @@ export const App: React.FC = () => {
 
         {/* Controles Centrais: Alternar Split Screen / Editor / PDF */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--bg-primary)', padding: '2px', borderRadius: '0.4rem', border: '1px solid var(--border)' }}>
+          <div
+            style={{
+              display: 'flex',
+              backgroundColor: 'var(--bg-card)',
+              padding: '2px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--border)',
+            }}
+          >
             <button
               onClick={() => setLayoutMode('split')}
               title="Tela Dividida (Código + PDF)"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.3rem 0.6rem',
-                backgroundColor: layoutMode === 'split' ? 'var(--bg-card)' : 'transparent',
-                color: layoutMode === 'split' ? 'var(--accent)' : 'var(--text-muted)',
-                border: 'none',
-                borderRadius: '0.3rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'split' ? 'active' : ''}`}
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
             >
               <Columns size={13} />
-              <span>Split (Overleaf)</span>
+              <span>Split</span>
             </button>
 
             <button
               onClick={() => setLayoutMode('editor')}
               title="Apenas Editor de Código"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.3rem 0.6rem',
-                backgroundColor: layoutMode === 'editor' ? 'var(--bg-card)' : 'transparent',
-                color: layoutMode === 'editor' ? 'var(--accent)' : 'var(--text-muted)',
-                border: 'none',
-                borderRadius: '0.3rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'editor' ? 'active' : ''}`}
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
             >
               <Code size={13} />
               <span>Código</span>
@@ -478,19 +497,8 @@ export const App: React.FC = () => {
             <button
               onClick={() => setLayoutMode('pdf')}
               title="Apenas Visualizador de PDF"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.3rem 0.6rem',
-                backgroundColor: layoutMode === 'pdf' ? 'var(--bg-card)' : 'transparent',
-                color: layoutMode === 'pdf' ? 'var(--accent)' : 'var(--text-muted)',
-                border: 'none',
-                borderRadius: '0.3rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'pdf' ? 'active' : ''}`}
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
             >
               <FileOutput size={13} />
               <span>PDF</span>
@@ -499,40 +507,45 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setShowHistory((prev) => !prev)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.35rem 0.65rem',
-              backgroundColor: showHistory ? 'var(--bg-card)' : 'transparent',
-              color: showHistory ? 'var(--accent)' : 'var(--text-muted)',
-              border: '1px solid var(--border)',
-              borderRadius: '0.4rem',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-            }}
+            className={`btn-overleaf ${showHistory ? 'btn-overleaf-secondary' : 'btn-overleaf-ghost'}`}
+            style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
+            title="Exibir histórico de deltas e snapshots"
           >
             <History size={13} />
-            <span>Snapshots ({snapshots.length})</span>
+            <span>Histórico ({snapshots.length})</span>
           </button>
         </div>
 
-        {/* Lado Direito: Nome e Colaboradores */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Você:</span>
+        {/* Lado Direito: Alternador de Tema, Apelido e Colaboradores */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+            className="btn-overleaf btn-overleaf-ghost"
+            style={{ padding: '0.3rem', width: '30px', height: '30px', justifyContent: 'center' }}
+          >
+            {theme === 'dark' ? (
+              <Sun size={15} style={{ color: 'var(--yellow-40)' }} />
+            ) : (
+              <Moon size={15} style={{ color: 'var(--blue-50)' }} />
+            )}
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Você:</span>
             <input
               type="text"
               value={userName}
               onChange={handleNameChange}
               style={{
-                backgroundColor: 'var(--bg-primary)',
+                backgroundColor: 'var(--bg-card)',
                 border: '1px solid var(--border)',
                 color: 'var(--text-main)',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.8rem',
-                width: '110px',
+                padding: '0.2rem 0.45rem',
+                borderRadius: 'var(--radius-base)',
+                fontSize: '0.75rem',
+                width: '100px',
+                outline: 'none',
               }}
             />
           </div>
@@ -553,6 +566,7 @@ export const App: React.FC = () => {
               remoteCursors={Array.from(remoteCursors.values())}
               authorHighlights={authorHighlights}
               activeEditor={activeEditor}
+              theme={theme}
               onApplyLocalDelta={handleApplyLocalDelta}
               onCursorMove={handleCursorMove}
               onClearHighlights={() => setAuthorHighlights([])}
