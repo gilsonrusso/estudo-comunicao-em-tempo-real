@@ -509,6 +509,13 @@ export function App() {
     }, 1000);
   };
 
+  // Filtra cursores remotos para exibir APENAS os colaboradores que estão no mesmo arquivo ativo
+  const activeFileRemoteCursors = useMemo(() => {
+    return Array.from(remoteCursors.values()).filter(
+      (c) => (c.file || 'main.tex') === activeFile
+    );
+  }, [remoteCursors, activeFile]);
+
   if (!documentData) {
     return (
       <Box
@@ -533,13 +540,6 @@ export function App() {
     : isMainFile
       ? (saveStatus === 'synced' ? 'synced' : 'saving')
       : (secondarySaveStatus[activeFile] || 'synced');
-
-  // Filtra cursores remotos para exibir APENAS os colaboradores que estão no mesmo arquivo ativo
-  const activeFileRemoteCursors = useMemo(() => {
-    return Array.from(remoteCursors.values()).filter(
-      (c) => (c.file || 'main.tex') === activeFile
-    );
-  }, [remoteCursors, activeFile]);
 
   return (
     <Box
