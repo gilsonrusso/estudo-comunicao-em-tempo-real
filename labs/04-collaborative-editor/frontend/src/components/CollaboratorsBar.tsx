@@ -1,6 +1,10 @@
 import { Collaborator } from '../types/collab.js';
 import { Users } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
+import Avatar from '@mui/material/Avatar';
 
 export interface CollaboratorsBarProps {
   collaborators: Collaborator[];
@@ -20,25 +24,27 @@ export function CollaboratorsBar({
   currentUserId,
 }: CollaboratorsBarProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+    <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
       <Tooltip title={`${collaborators.length} usuário(s) conectado(s)`} arrow>
-        <div
-          style={{
-            display: 'flex',
+        <Stack
+          direction="row"
+          spacing={0.5}
+          sx={{
             alignItems: 'center',
-            gap: '0.3rem',
-            color: 'var(--text-muted)',
+            color: 'text.secondary',
             fontSize: '0.78rem',
             fontWeight: 500,
             cursor: 'default',
           }}
         >
-          <Users size={14} style={{ color: 'var(--text-dim)' }} />
-          <span>{collaborators.length}</span>
-        </div>
+          <Users size={14} />
+          <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 600 }}>
+            {collaborators.length}
+          </Typography>
+        </Stack>
       </Tooltip>
 
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
         {collaborators.map((c, idx) => {
           const isMe = c.userId === currentUserId;
           return (
@@ -47,41 +53,33 @@ export function CollaboratorsBar({
               title={`${c.userName}${isMe ? ' (Você)' : ''}`}
               arrow
             >
-              <div
-                style={{
-                  position: 'relative',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  backgroundColor: c.color,
-                  color: '#ffffff',
-                  border: '2px solid var(--border-color, #ffffff)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+              <Avatar
+                sx={{
+                  width: 28,
+                  height: 28,
                   fontSize: '0.68rem',
                   fontWeight: 700,
+                  bgcolor: c.color,
+                  color: '#ffffff',
+                  border: '2px solid',
+                  borderColor: 'background.paper',
                   marginLeft: idx === 0 ? 0 : '-7px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  boxShadow: 1,
                   cursor: 'pointer',
-                  transition: 'transform 0.15s ease, z-index 0.15s',
                   zIndex: collaborators.length - idx,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.15) translateY(-2px)';
-                  e.currentTarget.style.zIndex = '30';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1) translateY(0)';
-                  e.currentTarget.style.zIndex = String(collaborators.length - idx);
+                  transition: 'transform 0.15s ease, z-index 0.15s',
+                  '&:hover': {
+                    transform: 'scale(1.15) translateY(-2px)',
+                    zIndex: 30,
+                  },
                 }}
               >
-                <span>{getInitials(c.userName)}</span>
-              </div>
+                {getInitials(c.userName)}
+              </Avatar>
             </Tooltip>
           );
         })}
-      </div>
-    </div>
+      </Box>
+    </Stack>
   );
 }

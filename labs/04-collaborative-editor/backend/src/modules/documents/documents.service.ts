@@ -267,6 +267,49 @@ export class DocumentsService {
   }
 
   /**
+   * Cria um novo arquivo de texto (ex: "references.bib", "preamble.tex") no projeto
+   */
+  async createProjectTextFile(
+    documentId: string,
+    virtualPath: string,
+    content: string = ''
+  ): Promise<ProjectFile> {
+    const cleanPath = virtualPath.replace(/^\/+/, '');
+    const ext = cleanPath.split('.').pop()?.toLowerCase() || '';
+
+    let fileType: string = 'other';
+    if (ext === 'bib') {
+      fileType = 'bib';
+    } else if (['sty', 'cls'].includes(ext)) {
+      fileType = 'style';
+    } else if (ext === 'tex') {
+      fileType = 'tex';
+    }
+
+    const fileId = randomUUID();
+    const projectFile: ProjectFile = {
+      id: fileId,
+      documentId,
+      path: cleanPath,
+      fileType,
+      mimeType: fileType === 'tex' ? 'text/x-tex' : fileType === 'bib' ? 'text/plain' : 'text/plain',
+      sizeBytes: Buffer.byteLength(content, 'utf-8'),
+      storageKey: null,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    return this.repository.saveProjectFile(projectFile);
+  }
+
+  /**
+   * Atualiza o conteúdo textual de um arquivo existente
+   */
+  async updateProjectFileContent(fileId: string, content: string): Promise<ProjectFile> {
+    return this.repository.updateProjectFileContent(fileId, content);
+  }
+
+  /**
    * Remove arquivo do MinIO e do banco de dados
    */
   async deleteProjectFile(fileId: string): Promise<void> {
@@ -309,7 +352,15 @@ export class DocumentsService {
     ];
 
     for (const file of projectFiles) {
-      if (file.storageKey) {
+      if (file.content !== null && file.content !== undefined) {
+        // Arquivo de texto (.bib, .tex complementar, .sty)
+        filesPayload.push({
+          path: file.path,
+          type: 'text',
+          content: file.content,
+        });
+      } else if (file.storageKey) {
+        // Imagem binária armazenada no MinIO
         filesPayload.push({
           path: file.path,
           type: 'binary_url',

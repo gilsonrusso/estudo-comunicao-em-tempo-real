@@ -9,11 +9,16 @@ import {
   Check,
   Clock,
 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import InputBase from '@mui/material/InputBase';
 import { CollaboratorsBar } from './CollaboratorsBar';
 import { Collaborator, SaveStatus } from '../types/collab';
 
@@ -70,81 +75,95 @@ export function IdeNavbar({
   };
 
   return (
-    <nav
+    <Box
+      component="nav"
       className="ide-redesign-toolbar"
-      style={{
-        height: '40px',
-        minHeight: '40px',
-        backgroundColor: 'var(--bg-paper)',
-        borderBottom: '1px solid var(--border-color)',
+      sx={{
+        height: 40,
+        minHeight: 40,
+        backgroundColor: 'background.paper',
+        borderBottom: 1,
+        borderColor: 'divider',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 0.85rem',
+        px: 1.5,
         userSelect: 'none',
         zIndex: 30,
       }}
     >
       {/* Lado Esquerdo: Logo Overleaf + Menubar (File, Edit, View) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         {/* Overleaf Leaf Brand Logo */}
-        <div
+        <Tooltip
           title={isConnected ? "SCI-LaTeX Studio • Conectado via WebSocket" : "SCI-LaTeX Studio • Desconectado"}
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            paddingRight: '0.4rem',
-          }}
+          arrow
         >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 100 100"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M10 50C10 27.9086 27.9086 10 50 10C72.0914 10 90 27.9086 90 50C90 72.0914 72.0914 90 50 90C27.9086 90 10 72.0914 10 50Z"
-              fill="var(--primary-main)"
-            />
-            <path
-              d="M32 68C32 68 44 65 52 53C60 41 68 28 68 28C68 28 54 36 44 46C34 56 32 68 32 68Z"
-              fill="#ffffff"
-            />
-          </svg>
-          <span
-            style={{
-              position: 'absolute',
-              bottom: '-2px',
-              right: '3px',
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              backgroundColor: isConnected ? '#10b981' : '#ef4444',
-              border: '1.5px solid var(--bg-paper)',
+          <Box
+            sx={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              pr: 0.5,
             }}
-          />
-        </div>
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 100 100"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 50C10 27.9086 27.9086 10 50 10C72.0914 10 90 27.9086 90 50C90 72.0914 72.0914 90 50 90C27.9086 90 10 72.0914 10 50Z"
+                fill="var(--primary-main, #098842)"
+              />
+              <path
+                d="M32 68C32 68 44 65 52 53C60 41 68 28 68 28C68 28 54 36 44 46C34 56 32 68 32 68Z"
+                fill="#ffffff"
+              />
+            </svg>
+            <Box
+              component="span"
+              sx={{
+                position: 'absolute',
+                bottom: -2,
+                right: 3,
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: isConnected ? '#10b981' : '#ef4444',
+                border: '1.5px solid',
+                borderColor: 'background.paper',
+              }}
+            />
+          </Box>
+        </Tooltip>
 
         {/* Desktop Menubar */}
-        <div
-          role="menubar"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}
-        >
-          <button
+        <Stack direction="row" spacing={0.3} sx={{ alignItems: 'center' }}>
+          <Button
+            size="small"
+            variant="text"
             onClick={(e) => handleOpenMenu(setFileMenuAnchor, e)}
-            className="btn-overleaf btn-overleaf-ghost"
-            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '26px' }}
+            sx={{
+              fontSize: '0.75rem',
+              height: 26,
+              px: 0.8,
+              minWidth: 'auto',
+              textTransform: 'none',
+              color: 'text.secondary',
+              '&:hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+            }}
           >
             File
-          </button>
+          </Button>
           <Menu
             anchorEl={fileMenuAnchor}
             open={Boolean(fileMenuAnchor)}
             onClose={() => handleCloseMenu(setFileMenuAnchor)}
-            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: '180px' } }}
+            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: 180 } }}
           >
             <MenuItem
               onClick={() => {
@@ -173,18 +192,27 @@ export function IdeNavbar({
             </MenuItem>
           </Menu>
 
-          <button
+          <Button
+            size="small"
+            variant="text"
             onClick={(e) => handleOpenMenu(setEditMenuAnchor, e)}
-            className="btn-overleaf btn-overleaf-ghost"
-            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '26px' }}
+            sx={{
+              fontSize: '0.75rem',
+              height: 26,
+              px: 0.8,
+              minWidth: 'auto',
+              textTransform: 'none',
+              color: 'text.secondary',
+              '&:hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+            }}
           >
             Edit
-          </button>
+          </Button>
           <Menu
             anchorEl={editMenuAnchor}
             open={Boolean(editMenuAnchor)}
             onClose={() => handleCloseMenu(setEditMenuAnchor)}
-            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: '160px' } }}
+            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: 160 } }}
           >
             <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>Desfazer (Ctrl+Z)</MenuItem>
             <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>Refazer (Ctrl+Y)</MenuItem>
@@ -192,18 +220,27 @@ export function IdeNavbar({
             <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>Localizar (Ctrl+F)</MenuItem>
           </Menu>
 
-          <button
+          <Button
+            size="small"
+            variant="text"
             onClick={(e) => handleOpenMenu(setViewMenuAnchor, e)}
-            className="btn-overleaf btn-overleaf-ghost"
-            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '26px' }}
+            sx={{
+              fontSize: '0.75rem',
+              height: 26,
+              px: 0.8,
+              minWidth: 'auto',
+              textTransform: 'none',
+              color: 'text.secondary',
+              '&:hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+            }}
           >
             View
-          </button>
+          </Button>
           <Menu
             anchorEl={viewMenuAnchor}
             open={Boolean(viewMenuAnchor)}
             onClose={() => handleCloseMenu(setViewMenuAnchor)}
-            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: '160px' } }}
+            sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: 160 } }}
           >
             <MenuItem
               onClick={() => {
@@ -230,36 +267,37 @@ export function IdeNavbar({
               Apenas PDF
             </MenuItem>
           </Menu>
-        </div>
-      </div>
+        </Stack>
+      </Stack>
 
       {/* Centro: Título do Projeto & Dropdown de Opções */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <button
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <Button
+          size="small"
+          variant="text"
           onClick={(e) => handleOpenMenu(setProjectMenuAnchor, e)}
-          className="btn-overleaf btn-overleaf-ghost"
-          style={{
+          endIcon={<ChevronDown size={14} />}
+          sx={{
             fontSize: '0.8rem',
             fontWeight: 600,
-            padding: '0.25rem 0.6rem',
-            borderRadius: '6px',
-            color: 'var(--text-primary)',
-            gap: '0.35rem',
-            maxWidth: '320px',
+            textTransform: 'none',
+            color: 'text.primary',
+            maxWidth: 320,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            px: 1,
+            height: 28,
           }}
         >
-          <span>{projectTitle}</span>
-          <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />
-        </button>
+          {projectTitle}
+        </Button>
 
         <Menu
           anchorEl={projectMenuAnchor}
           open={Boolean(projectMenuAnchor)}
           onClose={() => handleCloseMenu(setProjectMenuAnchor)}
-          sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: '220px' } }}
+          sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: 220 } }}
         >
           <MenuItem onClick={() => handleCloseMenu(setProjectMenuAnchor)}>
             Baixar como PDF
@@ -277,108 +315,143 @@ export function IdeNavbar({
         </Menu>
 
         {/* Indicador de Salvamento Real-time */}
-        <div
+        <Tooltip
           title={lastSavedAt ? `Última sincronização: ${lastSavedAt}` : 'Sincronizado via WebSocket'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.3rem',
-            fontSize: '0.7rem',
-            color: 'var(--text-secondary)',
-            cursor: 'default',
-          }}
+          arrow
         >
-          {saveStatus === 'saving' && (
-            <>
-              <Clock size={12} style={{ color: 'var(--yellow-40, #f59e0b)' }} />
-              <span>Salvando...</span>
-            </>
-          )}
-          {saveStatus === 'synced' && (
-            <>
-              <Check size={12} style={{ color: 'var(--primary-main)' }} />
-              <span>Salvo</span>
-            </>
-          )}
-        </div>
-      </div>
+          <Stack direction="row" spacing={0.4} sx={{ alignItems: 'center', cursor: 'default' }}>
+            {saveStatus === 'saving' && (
+              <>
+                <Clock size={12} style={{ color: '#f59e0b' }} />
+                <Typography component="span" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                  Salvando...
+                </Typography>
+              </>
+            )}
+            {saveStatus === 'synced' && (
+              <>
+                <Check size={12} style={{ color: 'var(--primary-main, #098842)' }} />
+                <Typography component="span" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                  Salvo
+                </Typography>
+              </>
+            )}
+          </Stack>
+        </Tooltip>
+      </Stack>
 
       {/* Lado Direito: Layout Switcher, History, Nickname, Collaborators e Botão Share */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         {/* Alternador de Layout Visual (Split, Editor, PDF) */}
-        <div
-          style={{
+        <Box
+          sx={{
             display: 'flex',
             alignItems: 'center',
-            backgroundColor: 'rgba(128, 128, 128, 0.08)',
-            padding: '2px',
-            borderRadius: '6px',
-            gap: '2px',
+            backgroundColor: 'action.hover',
+            p: 0.25,
+            borderRadius: 1,
+            gap: 0.25,
           }}
         >
           <Tooltip title="Visualização Dividida (Editor + PDF)" arrow>
-            <button
+            <IconButton
+              size="small"
               onClick={() => onLayoutChange('split')}
-              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'split' ? 'active' : ''}`}
-              style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', height: '24px' }}
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: 0.5,
+                backgroundColor: layoutMode === 'split' ? 'background.paper' : 'transparent',
+                color: layoutMode === 'split' ? 'primary.main' : 'text.secondary',
+                boxShadow: layoutMode === 'split' ? 1 : 0,
+              }}
             >
               <Columns size={13} />
-            </button>
+            </IconButton>
           </Tooltip>
 
           <Tooltip title="Apenas Editor" arrow>
-            <button
+            <IconButton
+              size="small"
               onClick={() => onLayoutChange('editor')}
-              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'editor' ? 'active' : ''}`}
-              style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', height: '24px' }}
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: 0.5,
+                backgroundColor: layoutMode === 'editor' ? 'background.paper' : 'transparent',
+                color: layoutMode === 'editor' ? 'primary.main' : 'text.secondary',
+                boxShadow: layoutMode === 'editor' ? 1 : 0,
+              }}
             >
               <Code size={13} />
-            </button>
+            </IconButton>
           </Tooltip>
 
           <Tooltip title="Apenas PDF" arrow>
-            <button
+            <IconButton
+              size="small"
               onClick={() => onLayoutChange('pdf')}
-              className={`btn-overleaf btn-overleaf-ghost ${layoutMode === 'pdf' ? 'active' : ''}`}
-              style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', height: '24px' }}
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: 0.5,
+                backgroundColor: layoutMode === 'pdf' ? 'background.paper' : 'transparent',
+                color: layoutMode === 'pdf' ? 'primary.main' : 'text.secondary',
+                boxShadow: layoutMode === 'pdf' ? 1 : 0,
+              }}
             >
               <FileOutput size={13} />
-            </button>
+            </IconButton>
           </Tooltip>
-        </div>
+        </Box>
 
         {/* Botão de Histórico */}
         <Tooltip title="Histórico de alterações e Snapshots" arrow>
-          <button
+          <Button
+            size="small"
+            variant={showHistory ? 'outlined' : 'text'}
             onClick={onToggleHistory}
-            className={`btn-overleaf ${showHistory ? 'btn-overleaf-secondary' : 'btn-overleaf-ghost'}`}
-            style={{ fontSize: '0.74rem', padding: '0.25rem 0.55rem', height: '26px' }}
+            startIcon={<History size={13} />}
+            sx={{
+              fontSize: '0.74rem',
+              height: 26,
+              px: 0.8,
+              textTransform: 'none',
+              color: showHistory ? 'primary.main' : 'text.secondary',
+              borderColor: 'divider',
+            }}
           >
-            <History size={13} />
-            <span>Histórico ({snapshotsCount})</span>
-          </button>
+            Histórico ({snapshotsCount})
+          </Button>
         </Tooltip>
 
         {/* Input Apelido */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Você:</span>
-          <input
-            type="text"
-            value={userName}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => onUserNameChange(e.target.value)}
-            style={{
-              backgroundColor: 'var(--bg-default)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
-              padding: '0.15rem 0.45rem',
-              borderRadius: '4px',
-              fontSize: '0.74rem',
-              width: '90px',
-              outline: 'none',
-              fontFamily: 'inherit',
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Typography component="span" sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+            Você:
+          </Typography>
+          <Box
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              px: 0.6,
+              py: 0.1,
+              backgroundColor: 'background.default',
             }}
-          />
-        </div>
+          >
+            <InputBase
+              value={userName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => onUserNameChange(e.target.value)}
+              sx={{
+                fontSize: '0.74rem',
+                width: 80,
+                color: 'text.primary',
+                '& input': { padding: 0 },
+              }}
+            />
+          </Box>
+        </Stack>
 
         {/* Pilha de Avatares dos Colaboradores */}
         <CollaboratorsBar collaborators={collaborators} currentUserId={userId} />
@@ -390,25 +463,24 @@ export function IdeNavbar({
           startIcon={<UserPlus size={14} />}
           onClick={() => alert(`Link de compartilhamento para o projeto: ${window.location.href}`)}
           sx={{
-            height: '28px',
+            height: 28,
             fontSize: '0.76rem',
             fontWeight: 600,
             textTransform: 'none',
-            backgroundColor: 'var(--primary-main)',
+            backgroundColor: 'primary.main',
             color: '#ffffff',
-            borderRadius: '6px',
-            padding: '0 12px',
+            borderRadius: 1,
+            px: 1.5,
             boxShadow: 'none',
             '&:hover': {
-              backgroundColor: 'var(--primary-main)',
-              filter: 'brightness(0.92)',
+              backgroundColor: 'primary.dark',
               boxShadow: 'none',
             },
           }}
         >
           Share
         </Button>
-      </div>
-    </nav>
+      </Stack>
+    </Box>
   );
 }

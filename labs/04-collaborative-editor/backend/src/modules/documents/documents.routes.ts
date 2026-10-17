@@ -9,6 +9,8 @@ import {
   GetDocumentParamsSchema,
   ProjectFileSchema,
   FileParamsSchema,
+  UpdateFileContentBodySchema,
+  CreateFileBodySchema,
 } from './documents.schema.js';
 
 export const documentsRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -169,5 +171,52 @@ export const documentsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     controller.deleteFile.bind(controller)
+  );
+
+  // Criar novo arquivo de texto (ex: .bib, .tex, .sty)
+  fastify.post(
+    '/api/documents/:documentId/files/create',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Criar novo arquivo de texto no projeto',
+        params: GetDocumentParamsSchema,
+        body: CreateFileBodySchema,
+        response: {
+          201: ProjectFileSchema,
+        },
+      },
+    },
+    controller.createFile.bind(controller)
+  );
+
+  // Obter conteúdo textual de um arquivo (.bib, .tex, .sty)
+  fastify.get(
+    '/api/documents/:documentId/files/:fileId/content',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Obter conteúdo textual do arquivo',
+        params: FileParamsSchema,
+      },
+    },
+    controller.getFileContent.bind(controller)
+  );
+
+  // Atualizar conteúdo textual de um arquivo (.bib, .tex, .sty)
+  fastify.put(
+    '/api/documents/:documentId/files/:fileId/content',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Atualizar conteúdo textual do arquivo',
+        params: FileParamsSchema,
+        body: UpdateFileContentBodySchema,
+        response: {
+          200: ProjectFileSchema,
+        },
+      },
+    },
+    controller.updateFileContent.bind(controller)
   );
 };

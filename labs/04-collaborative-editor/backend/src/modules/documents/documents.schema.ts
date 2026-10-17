@@ -70,6 +70,7 @@ export const ProjectFileSchema = z.object({
   mimeType: z.string(),
   sizeBytes: z.number(),
   storageKey: z.string().nullable(),
+  content: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -78,4 +79,13 @@ export type ProjectFile = z.infer<typeof ProjectFileSchema>;
 export const FileParamsSchema = z.object({
   documentId: z.string(),
   fileId: z.string(),
+});
+
+export const UpdateFileContentBodySchema = z.object({
+  content: z.string(),
+});
+
+export const CreateFileBodySchema = z.object({
+  path: z.string().min(1),
+  content: z.string().default(''),
 });

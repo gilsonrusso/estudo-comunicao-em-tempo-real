@@ -15,6 +15,7 @@ export interface IDocumentsRepository {
   listProjectFiles(documentId: string): Promise<ProjectFile[]>;
   findProjectFileById(fileId: string): Promise<ProjectFile | null>;
   saveProjectFile(file: ProjectFile): Promise<ProjectFile>;
+  updateProjectFileContent(fileId: string, content: string): Promise<ProjectFile>;
   deleteProjectFile(fileId: string): Promise<void>;
 }
 
@@ -121,12 +122,13 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
   async listProjectFiles(documentId: string): Promise<ProjectFile[]> {
     const res = await this.pool.query(
       `SELECT id, document_id as "documentId", path, file_type as "fileType", mime_type as "mimeType",
-              size_bytes as "sizeBytes", storage_key as "storageKey", created_at as "createdAt"
+              size_bytes as "sizeBytes", storage_key as "storageKey", content, created_at as "createdAt"
        FROM project_files WHERE document_id = $1 ORDER BY path ASC`,
       [documentId]
     );
     return res.rows.map((row) => ({
       ...row,
+      content: row.content || null,
       sizeBytes: Number(row.sizeBytes),
       createdAt: new Date(row.createdAt).toISOString(),
     }));
@@ -135,7 +137,7 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
   async findProjectFileById(fileId: string): Promise<ProjectFile | null> {
     const res = await this.pool.query(
       `SELECT id, document_id as "documentId", path, file_type as "fileType", mime_type as "mimeType",
-              size_bytes as "sizeBytes", storage_key as "storageKey", created_at as "createdAt"
+              size_bytes as "sizeBytes", storage_key as "storageKey", content, created_at as "createdAt"
        FROM project_files WHERE id = $1`,
       [fileId]
     );
@@ -143,6 +145,7 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
     const row = res.rows[0];
     return {
       ...row,
+      content: row.content || null,
       sizeBytes: Number(row.sizeBytes),
       createdAt: new Date(row.createdAt).toISOString(),
     };
@@ -150,16 +153,35 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
 
   async saveProjectFile(file: ProjectFile): Promise<ProjectFile> {
     await this.pool.query(
-      `INSERT INTO project_files (id, document_id, path, file_type, mime_type, size_bytes, storage_key, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO project_files (id, document_id, path, file_type, mime_type, size_bytes, storage_key, content, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (document_id, path) DO UPDATE SET
          file_type = EXCLUDED.file_type,
          mime_type = EXCLUDED.mime_type,
          size_bytes = EXCLUDED.size_bytes,
-         storage_key = EXCLUDED.storage_key`,
-      [file.id, file.documentId, file.path, file.fileType, file.mimeType, file.sizeBytes, file.storageKey, file.createdAt]
+         storage_key = EXCLUDED.storage_key,
+         content = EXCLUDED.content`,
+      [file.id, file.documentId, file.path, file.fileType, file.mimeType, file.sizeBytes, file.storageKey, file.content || null, file.createdAt]
     );
     return file;
+  }
+
+  async updateProjectFileContent(fileId: string, content: string): Promise<ProjectFile> {
+    const res = await this.pool.query(
+      `UPDATE project_files
+       SET content = $1, size_bytes = length($1)
+       WHERE id = $2
+       RETURNING id, document_id as "documentId", path, file_type as "fileType", mime_type as "mimeType",
+                 size_bytes as "sizeBytes", storage_key as "storageKey", content, created_at as "createdAt"`,
+      [content, fileId]
+    );
+    if (res.rows.length === 0) throw new Error(`Arquivo ${fileId} não encontrado`);
+    const row = res.rows[0];
+    return {
+      ...row,
+      sizeBytes: Number(row.sizeBytes),
+      createdAt: new Date(row.createdAt).toISOString(),
+    };
   }
 
   async deleteProjectFile(fileId: string): Promise<void> {

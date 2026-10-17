@@ -6,6 +6,10 @@ import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle } from '@code
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { AuthorHighlight, DeltaOperation, RemoteCursor, SaveStatus } from '../types/collab.js';
 import { CheckCircle2, Clock, CloudUpload, UserCheck, Trash2, Code2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 
 export interface CodeMirrorEditorProps {
   content: string;
@@ -343,116 +347,131 @@ export function CodeMirrorEditor({
   }, [content]);
 
   return (
-    <div
-      style={{
+    <Box
+      sx={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: 'var(--bg-editor)',
+        backgroundColor: 'background.default',
         overflow: 'hidden',
       }}
     >
       {/* Barra de Status e Ferramentas do CodeMirror (Estilo Overleaf) */}
-      <div
-        style={{
-          height: '42px',
-          padding: '0 1rem',
-          backgroundColor: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border)',
+      <Box
+        sx={{
+          height: 36,
+          px: 1.5,
+          backgroundColor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '0.8rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div
-            style={{
-              display: 'flex',
+        <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{
               alignItems: 'center',
-              gap: '0.35rem',
-              color: 'var(--text-main)',
+              color: 'text.primary',
               fontWeight: 600,
               fontSize: '0.78rem',
             }}
           >
-            <Code2 size={15} style={{ color: 'var(--accent)' }} />
-            <span>LaTeX (sTeX)</span>
-          </div>
+            <Code2 size={15} style={{ color: 'var(--primary-main, #098842)' }} />
+            <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 600 }}>
+              LaTeX (sTeX)
+            </Typography>
+          </Stack>
 
-          <span style={{ color: 'var(--border)' }}>•</span>
+          <Typography component="span" sx={{ color: 'divider' }}>•</Typography>
 
           {saveStatus === 'synced' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--green-50)', fontSize: '0.75rem', fontWeight: 500 }}>
+            <Stack direction="row" spacing={0.4} sx={{ alignItems: 'center', color: '#10b981', fontSize: '0.75rem', fontWeight: 500 }}>
               <CheckCircle2 size={13} />
-              <span>Sincronizado</span>
-            </div>
+              <Typography component="span" sx={{ fontSize: '0.75rem' }}>Sincronizado</Typography>
+            </Stack>
           )}
 
           {saveStatus === 'pending_debounce' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--yellow-40)', fontSize: '0.75rem', fontWeight: 500 }}>
+            <Stack direction="row" spacing={0.4} sx={{ alignItems: 'center', color: '#f59e0b', fontSize: '0.75rem', fontWeight: 500 }}>
               <Clock size={13} />
-              <span>Buffer Redis (3s)</span>
-            </div>
+              <Typography component="span" sx={{ fontSize: '0.75rem' }}>Buffer Redis (3s)</Typography>
+            </Stack>
           )}
 
           {saveStatus === 'saving' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--blue-50)', fontSize: '0.75rem', fontWeight: 500 }}>
+            <Stack direction="row" spacing={0.4} sx={{ alignItems: 'center', color: '#3b82f6', fontSize: '0.75rem', fontWeight: 500 }}>
               <CloudUpload size={13} />
-              <span>Gravando snapshot...</span>
-            </div>
+              <Typography component="span" sx={{ fontSize: '0.75rem' }}>Gravando snapshot...</Typography>
+            </Stack>
           )}
 
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.73rem' }}>
-            <span style={{ fontWeight: 600 }}>v{version}</span>
-            {lastSavedAt && <span> • {lastSavedAt}</span>}
-          </div>
+          <Typography sx={{ color: 'text.secondary', fontSize: '0.73rem' }}>
+            <Box component="span" sx={{ fontWeight: 600 }}>v{version}</Box>
+            {lastSavedAt && <Box component="span"> • {lastSavedAt}</Box>}
+          </Typography>
 
           {activeEditor && (
-            <div
-              style={{
+            <Box
+              sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem',
-                backgroundColor: 'var(--bg-card)',
-                border: `1px solid ${activeEditor.color}`,
-                padding: '0.15rem 0.5rem',
-                borderRadius: 'var(--radius-pill)',
+                gap: 0.5,
+                backgroundColor: 'background.paper',
+                border: 1,
+                borderColor: activeEditor.color,
+                px: 0.8,
+                py: 0.2,
+                borderRadius: 2,
                 color: activeEditor.color,
                 fontSize: '0.72rem',
                 fontWeight: 600,
               }}
             >
               <UserCheck size={12} />
-              <span>{activeEditor.userName} {activeEditor.action}</span>
-            </div>
+              <Typography component="span" sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'inherit' }}>
+                {activeEditor.userName} {activeEditor.action}
+              </Typography>
+            </Box>
           )}
-        </div>
+        </Stack>
 
         {authorHighlights.length > 0 && (
-          <button
+          <Button
+            size="small"
+            variant="text"
             onClick={onClearHighlights}
-            title="Limpar realces coloridos da tela"
-            className="btn-overleaf btn-overleaf-ghost"
-            style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+            startIcon={<Trash2 size={12} />}
+            sx={{
+              fontSize: '0.72rem',
+              height: 24,
+              textTransform: 'none',
+              color: 'text.secondary',
+              '&:hover': {
+                color: 'text.primary',
+              },
+            }}
           >
-            <Trash2 size={12} />
-            <span>Limpar Realces ({authorHighlights.length})</span>
-          </button>
+            Limpar Realces ({authorHighlights.length})
+          </Button>
         )}
-      </div>
+      </Box>
 
       {/* Container onde o CodeMirror 6 se anexa */}
-      <div
+      <Box
         ref={containerRef}
-        style={{
+        sx={{
           flex: 1,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
         }}
       />
-    </div>
+    </Box>
   );
-};
+}

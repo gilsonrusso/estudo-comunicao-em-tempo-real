@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { useColorMode } from './theme/index';
 import { IdeNavbar } from './components/IdeNavbar';
 import { ActivityRail, type ActiveSidebarPanel } from './components/ActivityRail';
-import { FileTreeSidebar } from './components/FileTreeSidebar';
+import { FileTreeSidebar, type ProjectFile } from './components/FileTreeSidebar';
+import { EditorTabBar, type EditorTab } from './components/EditorTabBar';
 import { CodeMirrorEditor } from './components/CodeMirrorEditor';
 import { PdfPreview } from './components/PdfPreview';
 import { HistorySidebar } from './components/HistorySidebar';
@@ -87,6 +90,12 @@ export function App() {
   // Estados de Painéis e Layout do Overleaf Redesign
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<ActiveSidebarPanel>('files');
   const [activeFile, setActiveFile] = useState<string>('main.tex');
+  const [openTabs, setOpenTabs] = useState<EditorTab[]>([
+    { id: 'main', name: 'main.tex', type: 'tex', isMain: true },
+  ]);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [secondarySaveStatus, setSecondarySaveStatus] = useState<Record<string, 'synced' | 'saving'>>({});
+  const fileSaveDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [layoutMode, setLayoutMode] = useState<'split' | 'editor' | 'pdf'>('split');
   const [showHistory, setShowHistory] = useState<boolean>(false);
 
@@ -411,35 +420,114 @@ export function App() {
     }
   };
 
+  // Abre arquivo em uma nova aba do editor
+  const handleOpenFile = async (file: ProjectFile) => {
+    setOpenTabs((prev) => {
+      if (prev.some((t) => t.name === file.name)) return prev;
+      return [...prev, { id: file.id, name: file.name, type: file.type, isMain: file.isMain }];
+    });
+    setActiveFile(file.name);
+
+    if (!file.isMain && fileContents[file.name] === undefined) {
+      if (file.content !== undefined && file.content !== null) {
+        setFileContents((prev) => ({ ...prev, [file.name]: file.content! }));
+      } else {
+        try {
+          const res = await fetch(`${API_BASE}/api/documents/${DOC_ID}/files/${file.id}/content`);
+          if (res.ok) {
+            const data = await res.json();
+            setFileContents((prev) => ({ ...prev, [file.name]: data.content }));
+          }
+        } catch (err) {
+          console.error('Erro ao buscar conteúdo do arquivo:', err);
+        }
+      }
+    }
+  };
+
+  // Fecha aba do editor
+  const handleCloseTab = (fileName: string) => {
+    if (fileName === 'main.tex') return;
+    setOpenTabs((prev) => {
+      const filtered = prev.filter((t) => t.name !== fileName);
+      if (activeFile === fileName) {
+        const next = filtered[filtered.length - 1] || { name: 'main.tex' };
+        setActiveFile(next.name);
+      }
+      return filtered;
+    });
+  };
+
+  // Aplicação e persistência de deltas para arquivos secundários (.bib, .tex complementar)
+  const handleSecondaryDelta = (delta: { type: 'insert' | 'delete'; position: number; text?: string; length?: number }) => {
+    const current = fileContents[activeFile] || '';
+    let updated = current;
+    const pos = Math.max(0, Math.min(delta.position, current.length));
+    if (delta.type === 'insert' && delta.text) {
+      updated = current.slice(0, pos) + delta.text + current.slice(pos);
+    } else if (delta.type === 'delete' && delta.length) {
+      updated = current.slice(0, pos) + current.slice(pos + delta.length);
+    }
+
+    setFileContents((prev) => ({ ...prev, [activeFile]: updated }));
+    setSecondarySaveStatus((prev) => ({ ...prev, [activeFile]: 'saving' }));
+
+    const tab = openTabs.find((t) => t.name === activeFile);
+    if (!tab || tab.isMain) return;
+
+    if (fileSaveDebounceRef.current[activeFile]) {
+      clearTimeout(fileSaveDebounceRef.current[activeFile]);
+    }
+
+    fileSaveDebounceRef.current[activeFile] = setTimeout(async () => {
+      try {
+        await fetch(`${API_BASE}/api/documents/${DOC_ID}/files/${tab.id}/content`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: updated }),
+        });
+        setSecondarySaveStatus((prev) => ({ ...prev, [activeFile]: 'synced' }));
+      } catch (err) {
+        console.error('Falha ao salvar arquivo secundário:', err);
+      }
+    }, 1000);
+  };
+
   if (!documentData) {
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           display: 'flex',
           height: '100vh',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'var(--bg-default)',
-          color: 'var(--text-secondary)',
-          fontFamily: 'var(--font-sans)',
+          backgroundColor: 'background.default',
+          color: 'text.secondary',
         }}
       >
-        <p>Conectando ao documento e carregando deltas...</p>
-      </div>
+        <Typography variant="body2">Conectando ao documento e carregando deltas...</Typography>
+      </Box>
     );
   }
 
+  const isMainFile = activeFile === 'main.tex';
+  const currentEditorContent = isMainFile ? documentData.content : (fileContents[activeFile] ?? '');
+  const currentSaveStatus: 'synced' | 'saving' | 'offline' = !isConnected
+    ? 'offline'
+    : isMainFile
+      ? (saveStatus === 'synced' ? 'synced' : 'saving')
+      : (secondarySaveStatus[activeFile] || 'synced');
+
   return (
-    <div
+    <Box
       id="ide-root"
-      style={{
+      sx={{
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
         overflow: 'hidden',
-        backgroundColor: 'var(--bg-default)',
-        color: 'var(--text-primary)',
-        fontFamily: 'var(--font-sans)',
+        backgroundColor: 'background.default',
+        color: 'text.primary',
       }}
     >
       {/* 1. Top Navbar no Estilo Autêntico Overleaf */}
@@ -462,9 +550,9 @@ export function App() {
       />
 
       {/* 2. Área de Trabalho Principal (Activity Rail + File Tree + Split Panes) */}
-      <div
+      <Box
         className="ide-redesign-inner"
-        style={{
+        sx={{
           flex: 1,
           display: 'flex',
           overflow: 'hidden',
@@ -492,6 +580,7 @@ export function App() {
             apiBase={API_BASE}
             activeFile={activeFile}
             onSelectFile={setActiveFile}
+            onOpenFile={handleOpenFile}
             onClose={() => setActiveSidebarPanel(null)}
             documentContent={documentData.content}
             onInsertSnippet={handleInsertSnippet}
@@ -499,71 +588,60 @@ export function App() {
         )}
 
         {/* Workspace Central: Code Editor & PDF Viewer */}
-        <main
-          style={{
+        <Box
+          component="main"
+          sx={{
             flex: 1,
             display: 'flex',
             overflow: 'hidden',
-            backgroundColor: 'var(--bg-default)',
+            backgroundColor: 'background.default',
           }}
         >
-          {/* Lado Esquerdo: Editor CodeMirror 6 */}
+          {/* Lado Esquerdo: Editor CodeMirror 6 com Abas */}
           {(layoutMode === 'split' || layoutMode === 'editor') && (
-            <div
-              style={{
+            <Box
+              sx={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                borderRight:
-                  layoutMode === 'split' ? '1px solid var(--border-color)' : 'none',
+                borderRight: layoutMode === 'split' ? 1 : 0,
+                borderColor: 'divider',
               }}
             >
-              {/* Breadcrumb / Tab bar no topo do editor */}
-              <div
-                style={{
-                  height: '32px',
-                  backgroundColor: 'var(--bg-paper)',
-                  borderBottom: '1px solid var(--border-color)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 0.75rem',
-                  fontSize: '0.74rem',
-                  color: 'var(--text-secondary)',
-                  gap: '0.4rem',
-                }}
-              >
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {activeFile}
-                </span>
-                <span style={{ color: 'var(--text-secondary)' }}>•</span>
-                <span style={{ fontSize: '0.7rem' }}>
-                  {saveStatus === 'saving' ? 'Gravando deltas...' : 'Sincronizado em tempo real'}
-                </span>
-              </div>
+              {/* Tab bar com abas dinâmicas estilo Overleaf */}
+              <EditorTabBar
+                openTabs={openTabs}
+                activeFile={activeFile}
+                onSelectTab={setActiveFile}
+                onCloseTab={handleCloseTab}
+                saveStatus={currentSaveStatus}
+                lastSavedAt={lastSavedAt}
+              />
 
-              <div style={{ flex: 1, overflow: 'hidden' }}>
+              <Box sx={{ flex: 1, overflow: 'hidden' }}>
                 <CodeMirrorEditor
-                  content={documentData.content}
+                  key={activeFile}
+                  content={currentEditorContent}
                   version={documentData.version}
-                  saveStatus={saveStatus}
+                  saveStatus={isMainFile ? saveStatus : (secondarySaveStatus[activeFile] === 'saving' ? 'saving' : 'synced')}
                   lastSavedAt={lastSavedAt}
-                  remoteCursors={Array.from(remoteCursors.values())}
-                  authorHighlights={authorHighlights}
-                  activeEditor={activeEditor}
+                  remoteCursors={isMainFile ? Array.from(remoteCursors.values()) : []}
+                  authorHighlights={isMainFile ? authorHighlights : []}
+                  activeEditor={isMainFile ? activeEditor : null}
                   theme={themeMode}
-                  onApplyLocalDelta={handleApplyLocalDelta}
+                  onApplyLocalDelta={isMainFile ? handleApplyLocalDelta : handleSecondaryDelta}
                   onCursorMove={handleCursorMove}
                   onClearHighlights={() => setAuthorHighlights([])}
                 />
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
 
           {/* Lado Direito: Visualizador de PDF com TeX Live Recompile */}
           {(layoutMode === 'split' || layoutMode === 'pdf') && (
-            <div
-              style={{
+            <Box
+              sx={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
@@ -577,7 +655,7 @@ export function App() {
                 lastCompiledAt={lastCompiledAt}
                 onRecompile={handleRecompile}
               />
-            </div>
+            </Box>
           )}
 
           {/* Sidebar do Histórico de Deltas & Snapshots */}
@@ -590,8 +668,8 @@ export function App() {
               isFlushing={isFlushing}
             />
           )}
-        </main>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Box>
   );
 }

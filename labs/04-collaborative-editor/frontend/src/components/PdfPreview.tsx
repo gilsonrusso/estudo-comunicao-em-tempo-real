@@ -1,4 +1,9 @@
 import { RefreshCw, ExternalLink, AlertTriangle, FileCheck, Download } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 
 export interface PdfPreviewProps {
   pdfBlobUrl: string | null;
@@ -16,172 +21,197 @@ export function PdfPreview({
   onRecompile,
 }: PdfPreviewProps) {
   return (
-    <div
-      style={{
+    <Box
+      sx={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: 'var(--bg-pdf)',
-        borderLeft: '1px solid var(--border)',
+        backgroundColor: 'background.default',
+        borderLeft: 1,
+        borderColor: 'divider',
         overflow: 'hidden',
       }}
     >
       {/* Barra de Ações do PDF (Estilo Overleaf) */}
-      <div
-        style={{
-          height: '42px',
-          padding: '0 1rem',
-          backgroundColor: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border)',
+      <Box
+        sx={{
+          height: 36,
+          px: 1.5,
+          backgroundColor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '0.8rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Button
+            variant="contained"
+            size="small"
             onClick={onRecompile}
             disabled={isCompiling}
-            className="btn-overleaf btn-overleaf-primary"
-            title="Recompilar código LaTeX no servidor TeX Live (Ctrl+Enter)"
+            startIcon={<RefreshCw size={14} className={isCompiling ? 'spin' : ''} />}
+            sx={{
+              height: 26,
+              fontSize: '0.75rem',
+              textTransform: 'none',
+              px: 1.2,
+              backgroundColor: 'primary.main',
+              '&:hover': {
+                backgroundColor: 'primary.dark',
+              },
+            }}
           >
-            <RefreshCw size={13} className={isCompiling ? 'spin' : ''} />
-            <span>{isCompiling ? 'Compilando...' : 'Recompile'}</span>
-          </button>
+            {isCompiling ? 'Compilando...' : 'Recompile'}
+          </Button>
 
           {lastCompiledAt && !compileError && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                color: 'var(--green-50)',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-              }}
-            >
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', color: '#10b981' }}>
               <FileCheck size={14} />
-              <span>PDF atualizado ({lastCompiledAt})</span>
-            </div>
+              <Typography component="span" sx={{ fontSize: '0.74rem', fontWeight: 500 }}>
+                PDF atualizado ({lastCompiledAt})
+              </Typography>
+            </Stack>
           )}
-        </div>
+        </Stack>
 
         {pdfBlobUrl && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <a
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Button
+              component="a"
               href={pdfBlobUrl}
               download="artigo-overleaf.pdf"
-              title="Baixar PDF gerado"
-              className="btn-overleaf btn-overleaf-secondary"
+              size="small"
+              variant="outlined"
+              startIcon={<Download size={13} />}
+              sx={{
+                height: 24,
+                fontSize: '0.72rem',
+                textTransform: 'none',
+                borderColor: 'divider',
+                color: 'text.secondary',
+                '&:hover': {
+                  borderColor: 'text.secondary',
+                  color: 'text.primary',
+                },
+              }}
             >
-              <Download size={13} />
-              <span>Baixar</span>
-            </a>
+              Baixar
+            </Button>
 
-            <a
+            <Button
+              component="a"
               href={pdfBlobUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title="Abrir PDF em nova aba"
-              className="btn-overleaf btn-overleaf-secondary"
+              size="small"
+              variant="outlined"
+              startIcon={<ExternalLink size={13} />}
+              sx={{
+                height: 24,
+                fontSize: '0.72rem',
+                textTransform: 'none',
+                borderColor: 'divider',
+                color: 'text.secondary',
+                '&:hover': {
+                  borderColor: 'text.secondary',
+                  color: 'text.primary',
+                },
+              }}
             >
-              <ExternalLink size={13} />
-              <span>Nova Aba</span>
-            </a>
-          </div>
+              Nova Aba
+            </Button>
+          </Stack>
         )}
-      </div>
+      </Box>
 
       {/* Área de Visualização com suporte a Light e Dark */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {compileError ? (
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: 'rgba(184, 58, 51, 0.08)',
-              border: '1px solid var(--red-50)',
-              margin: '1rem',
-              borderRadius: 'var(--radius-medium)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--red-50)', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {compileError && (
+          <Box sx={{ p: 1.5, m: 1.5, border: 1, borderColor: 'error.main', borderRadius: 1, backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', color: 'error.main', mb: 1 }}>
               <AlertTriangle size={16} />
-              <span>Falha de Compilação do LaTeX</span>
-            </div>
-            <pre
-              style={{
-                backgroundColor: 'var(--bg-editor)',
-                color: 'var(--red-40)',
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-base)',
-                fontSize: '0.75rem',
-                lineHeight: '1.5',
+              <Typography sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Falha de Compilação do LaTeX</Typography>
+            </Stack>
+            <Box
+              component="pre"
+              sx={{
+                backgroundColor: 'background.paper',
+                color: 'error.light',
+                p: 1,
+                borderRadius: 1,
+                fontSize: '0.74rem',
+                lineHeight: 1.5,
                 overflowX: 'auto',
                 whiteSpace: 'pre-wrap',
-                fontFamily: 'var(--font-mono)',
-                maxHeight: '280px',
-                border: '1px solid var(--border)',
+                fontFamily: 'monospace',
+                maxHeight: 280,
+                border: 1,
+                borderColor: 'divider',
+                m: 0,
               }}
             >
               {compileError}
-            </pre>
-          </div>
-        ) : null}
+            </Box>
+          </Box>
+        )}
 
         {pdfBlobUrl ? (
-          <div style={{ flex: 1, width: '100%', height: '100%', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-            <iframe
+          <Box sx={{ flex: 1, width: '100%', height: '100%', p: 1, display: 'flex', justifyContent: 'center' }}>
+            <Box
+              component="iframe"
               src={`${pdfBlobUrl}#toolbar=1&navpanes=0`}
               title="Pré-visualização do PDF"
-              style={{
+              sx={{
                 width: '100%',
                 height: '100%',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-base)',
-                boxShadow: 'var(--pdf-shadow)',
-                backgroundColor: 'var(--white)',
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+                backgroundColor: '#ffffff',
               }}
             />
-          </div>
+          </Box>
         ) : !isCompiling ? (
-          <div
-            style={{
+          <Stack
+            spacing={1}
+            sx={{
               flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--text-muted)',
-              gap: '0.75rem',
-              padding: '2rem',
+              color: 'text.secondary',
+              p: 3,
               textAlign: 'center',
             }}
           >
-            <FileCheck size={38} style={{ color: 'var(--text-dim)' }} />
-            <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-main)' }}>Nenhum PDF compilado ainda</p>
-            <p style={{ fontSize: '0.78rem', maxWidth: '300px', lineHeight: '1.4' }}>
+            <FileCheck size={38} />
+            <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, color: 'text.primary' }}>
+              Nenhum PDF compilado ainda
+            </Typography>
+            <Typography sx={{ fontSize: '0.78rem', maxWidth: 300, lineHeight: 1.4, color: 'text.secondary' }}>
               Clique em <strong>Recompile</strong> acima para compilar o código LaTeX no micro-serviço TeX Live.
-            </p>
-          </div>
+            </Typography>
+          </Stack>
         ) : (
-          <div
-            style={{
+          <Stack
+            spacing={1.5}
+            sx={{
               flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--accent)',
-              gap: '0.75rem',
+              color: 'primary.main',
             }}
           >
-            <RefreshCw size={28} className="spin" />
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>Compilando documento via pdflatex...</span>
-          </div>
+            <CircularProgress size={28} color="inherit" />
+            <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: 'text.primary' }}>
+              Compilando documento via pdflatex...
+            </Typography>
+          </Stack>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
-};
+}

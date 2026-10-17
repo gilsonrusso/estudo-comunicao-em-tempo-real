@@ -143,4 +143,51 @@ export class DocumentsController {
       return reply.status(500).send({ error: error.message });
     }
   }
+
+  async createFile(
+    request: FastifyRequest<{ Params: { documentId: string }; Body: { path: string; content?: string } }>,
+    reply: FastifyReply
+  ) {
+    const { documentId } = request.params;
+    const { path, content = '' } = request.body;
+    try {
+      const file = await this.service.createProjectTextFile(documentId, path, content);
+      return reply.status(201).send(file);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(500).send({ error: error.message });
+    }
+  }
+
+  async getFileContent(
+    request: FastifyRequest<{ Params: { documentId: string; fileId: string } }>,
+    reply: FastifyReply
+  ) {
+    const { fileId } = request.params;
+    const files = await this.service.listProjectFiles(request.params.documentId);
+    const file = files.find((f) => f.id === fileId);
+    if (!file) {
+      return reply.status(404).send({ error: 'Arquivo não encontrado' });
+    }
+    return reply.status(200).send({
+      id: file.id,
+      path: file.path,
+      content: file.content || '',
+    });
+  }
+
+  async updateFileContent(
+    request: FastifyRequest<{ Params: { documentId: string; fileId: string }; Body: { content: string } }>,
+    reply: FastifyReply
+  ) {
+    const { fileId } = request.params;
+    const { content } = request.body;
+    try {
+      const file = await this.service.updateProjectFileContent(fileId, content);
+      return reply.status(200).send(file);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(500).send({ error: error.message });
+    }
+  }
 }

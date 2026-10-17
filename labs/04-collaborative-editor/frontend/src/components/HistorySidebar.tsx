@@ -1,5 +1,10 @@
 import { DeltaOperation, DocumentSnapshot } from '../types/collab.js';
 import { History, Database, Cpu, HardDriveDownload } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
 
 export interface HistorySidebarProps {
   documentId: string;
@@ -16,11 +21,13 @@ export function HistorySidebar({
   isFlushing,
 }: HistorySidebarProps) {
   return (
-    <aside
-      style={{
-        width: '360px',
-        backgroundColor: 'var(--bg-secondary)',
-        borderLeft: '1px solid var(--border)',
+    <Box
+      component="aside"
+      sx={{
+        width: 360,
+        backgroundColor: 'background.paper',
+        borderLeft: 1,
+        borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -28,166 +35,180 @@ export function HistorySidebar({
       }}
     >
       {/* Header da Sidebar */}
-      <div
-        style={{
-          height: '42px',
-          padding: '0 1rem',
-          borderBottom: '1px solid var(--border)',
+      <Box
+        sx={{
+          height: 36,
+          px: 1.5,
+          borderBottom: 1,
+          borderColor: 'divider',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: 'var(--bg-secondary)',
+          backgroundColor: 'background.paper',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          <History size={16} style={{ color: 'var(--accent)' }} />
-          <h3 style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>Histórico & Deltas</h3>
-        </div>
+        <Stack direction="row" spacing={0.8} sx={{ alignItems: 'center' }}>
+          <History size={16} style={{ color: 'var(--primary-main, #098842)' }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
+            Histórico & Deltas
+          </Typography>
+        </Stack>
 
-        <button
+        <Button
+          size="small"
+          variant="outlined"
           onClick={onManualFlush}
           disabled={isFlushing}
-          title="Salva um Snapshot no PostgreSQL imediatamente"
-          className="btn-overleaf btn-overleaf-secondary"
-          style={{ fontSize: '0.72rem', padding: '0.2rem 0.6rem' }}
+          startIcon={<HardDriveDownload size={13} />}
+          sx={{
+            fontSize: '0.72rem',
+            height: 24,
+            px: 1,
+            textTransform: 'none',
+            color: 'primary.main',
+            borderColor: 'divider',
+          }}
         >
-          <HardDriveDownload size={13} style={{ color: 'var(--green-50)' }} />
-          <span>{isFlushing ? 'Gravando...' : 'Flush'}</span>
-        </button>
-      </div>
+          {isFlushing ? 'Gravando...' : 'Flush'}
+        </Button>
+      </Box>
 
       {/* Explicação Didática */}
-      <div
-        style={{
-          margin: '0.75rem',
-          padding: '0.65rem 0.75rem',
-          backgroundColor: 'rgba(54, 108, 191, 0.08)',
-          border: '1px solid rgba(54, 108, 191, 0.25)',
-          borderRadius: 'var(--radius-base)',
-          fontSize: '0.73rem',
-          lineHeight: '1.45',
-          color: 'var(--text-main)',
+      <Paper
+        variant="outlined"
+        sx={{
+          m: 1.5,
+          p: 1.2,
+          backgroundColor: 'action.hover',
+          borderColor: 'divider',
+          borderRadius: 1,
         }}
       >
-        <strong style={{ color: 'var(--blue-50)' }}>Arquitetura Overleaf:</strong>
-        <p style={{ marginTop: '0.2rem' }}>
+        <Typography sx={{ fontSize: '0.74rem', fontWeight: 700, color: 'primary.main', mb: 0.5 }}>
+          Arquitetura Overleaf:
+        </Typography>
+        <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', mb: 0.3 }}>
           1. Cada tecla gera um <strong>Delta</strong> minúsculo via WebSocket (RAM / Redis).
-        </p>
-        <p>
-          2. Após <strong>3 segundos</strong> sem digitação (debounce), o servidor consolida o <strong>Snapshot</strong> no banco.
-        </p>
-      </div>
+        </Typography>
+        <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+          2. Após <strong>3 segundos</strong> sem digitação (debounce), o servidor consolida o <strong>Snapshot</strong> no PostgreSQL.
+        </Typography>
+      </Paper>
 
       {/* Seção 1: Snapshots / Checkpoints no Banco de Dados */}
-      <div style={{ padding: '0 0.75rem', marginBottom: '0.5rem' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: '0.72rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.4px',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-            marginBottom: '0.4rem',
-          }}
-        >
-          <Database size={13} style={{ color: 'var(--blue-40)' }} />
-          <span>Snapshots no Banco ({snapshots.length})</span>
-        </div>
+      <Box sx={{ px: 1.5, mb: 1 }}>
+        <Stack direction="row" spacing={0.6} sx={{ alignItems: 'center', mb: 0.8 }}>
+          <Database size={13} style={{ color: '#3b82f6' }} />
+          <Typography
+            sx={{
+              fontSize: '0.72rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.4px',
+              color: 'text.secondary',
+              fontWeight: 600,
+            }}
+          >
+            Snapshots no Banco ({snapshots.length})
+          </Typography>
+        </Stack>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '160px', overflowY: 'auto' }}>
+        <Stack spacing={0.6} sx={{ maxHeight: 150, overflowY: 'auto' }}>
           {snapshots.map((s) => (
-            <div
+            <Paper
               key={s.id}
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-base)',
-                padding: '0.45rem 0.6rem',
-                fontSize: '0.75rem',
+              variant="outlined"
+              sx={{
+                p: 0.8,
+                backgroundColor: 'background.default',
+                borderColor: 'divider',
+                borderRadius: 1,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ color: 'var(--blue-50)' }}>Versão {s.version}</strong>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography sx={{ fontSize: '0.74rem', fontWeight: 700, color: 'primary.main' }}>
+                  Versão {s.version}
+                </Typography>
+                <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary' }}>
                   {new Date(s.createdAt).toLocaleTimeString()}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                Salvo por: <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{s.savedBy}</span> ({s.reason})
-              </div>
-            </div>
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mt: 0.2 }}>
+                Salvo por: <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>{s.savedBy}</Box> ({s.reason})
+              </Typography>
+            </Paper>
           ))}
-        </div>
-      </div>
+        </Stack>
+      </Box>
 
       {/* Seção 2: Stream de Operações Atômicas */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.5rem 0.75rem', overflow: 'hidden' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: '0.72rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.4px',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-            marginBottom: '0.4rem',
-          }}
-        >
-          <Cpu size={13} style={{ color: 'var(--accent)' }} />
-          <span>Stream de Deltas ({operations.length})</span>
-        </div>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', px: 1.5, pb: 1.5, overflow: 'hidden' }}>
+        <Stack direction="row" spacing={0.6} sx={{ alignItems: 'center', mb: 0.8 }}>
+          <Cpu size={13} style={{ color: 'var(--primary-main, #098842)' }} />
+          <Typography
+            sx={{
+              fontSize: '0.72rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.4px',
+              color: 'text.secondary',
+              fontWeight: 600,
+            }}
+          >
+            Stream de Deltas ({operations.length})
+          </Typography>
+        </Stack>
 
-        <div
-          style={{
+        <Stack
+          spacing={0.5}
+          sx={{
             flex: 1,
             overflowY: 'auto',
-            display: 'flex',
             flexDirection: 'column-reverse',
-            gap: '0.3rem',
           }}
         >
           {operations.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '1rem' }}>
+            <Typography sx={{ textAlign: 'center', color: 'text.secondary', fontSize: '0.78rem', p: 2 }}>
               Nenhuma alteração recente ainda. Comece a digitar!
-            </div>
+            </Typography>
           ) : (
             operations.map((op, idx) => (
-              <div
+              <Paper
                 key={idx}
-                className="mono"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-xs)',
-                  padding: '0.35rem 0.5rem',
-                  fontSize: '0.7rem',
+                variant="outlined"
+                sx={{
+                  p: 0.6,
+                  backgroundColor: 'background.default',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  fontFamily: 'monospace',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{op.userName}</span>
-                  <span>{new Date(op.timestamp).toLocaleTimeString()}</span>
-                </div>
-                <div style={{ marginTop: '0.2rem', color: op.type === 'insert' ? 'var(--green-50)' : 'var(--red-50)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.7rem' }}>
+                  <Typography component="span" sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.7rem' }}>
+                    {op.userName}
+                  </Typography>
+                  <Typography component="span" sx={{ fontSize: '0.68rem', color: 'text.secondary' }}>
+                    {new Date(op.timestamp).toLocaleTimeString()}
+                  </Typography>
+                </Box>
+                <Typography
+                  sx={{
+                    mt: 0.3,
+                    fontSize: '0.7rem',
+                    color: op.type === 'insert' ? '#10b981' : '#ef4444',
+                    fontFamily: 'monospace',
+                  }}
+                >
                   {op.type === 'insert' ? (
-                    <span>
-                      + INSERT na pos <strong>{op.position}</strong>: "{op.text}"
-                    </span>
+                    <>+ INSERT pos <strong>{op.position}</strong>: "{op.text}"</>
                   ) : (
-                    <span>
-                      - DELETE na pos <strong>{op.position}</strong> (tamanho {op.length})
-                    </span>
+                    <>- DELETE pos <strong>{op.position}</strong> (len {op.length})</>
                   )}
-                </div>
-              </div>
+                </Typography>
+              </Paper>
             ))
           )}
-        </div>
-      </div>
-    </aside>
+        </Stack>
+      </Box>
+    </Box>
   );
-};
+}

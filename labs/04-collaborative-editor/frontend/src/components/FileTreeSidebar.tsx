@@ -5,6 +5,7 @@ import {
   BookMarked,
   Image as ImageIcon,
   Folder,
+  FilePlus,
   Upload,
   X,
   ListTree,
@@ -12,6 +13,9 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Dialog from '@mui/material/Dialog';
@@ -19,6 +23,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 
 export interface ProjectFile {
   id: string;
@@ -28,6 +33,7 @@ export interface ProjectFile {
   sizeBytes?: number;
   mimeType?: string;
   storageKey?: string;
+  content?: string | null;
 }
 
 export interface FileTreeSidebarProps {
@@ -35,6 +41,7 @@ export interface FileTreeSidebarProps {
   apiBase?: string;
   activeFile: string;
   onSelectFile: (fileName: string) => void;
+  onOpenFile?: (file: ProjectFile) => void;
   onClose: () => void;
   documentContent?: string;
   onInsertSnippet?: (snippet: string) => void;
@@ -45,6 +52,7 @@ export function FileTreeSidebar({
   apiBase = '',
   activeFile,
   onSelectFile,
+  onOpenFile,
   onClose,
   documentContent = '',
   onInsertSnippet,
@@ -53,6 +61,9 @@ export function FileTreeSidebar({
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Carrega arquivos reais persistidos no backend / MinIO
@@ -64,10 +75,11 @@ export function FileTreeSidebar({
         const mapped: ProjectFile[] = data.map((item: any) => ({
           id: item.id,
           name: item.path,
-          type: item.fileType === 'image' ? 'image' : item.fileType === 'bib' ? 'bib' : 'other',
+          type: item.fileType === 'image' ? 'image' : item.fileType === 'bib' ? 'bib' : item.fileType === 'tex' ? 'tex' : 'other',
           sizeBytes: item.sizeBytes,
           mimeType: item.mimeType,
           storageKey: item.storageKey,
+          content: item.content,
         }));
         setProjectFiles(mapped);
       }
@@ -91,7 +103,53 @@ export function FileTreeSidebar({
     return [mainEntry, ...projectFiles];
   }, [projectFiles]);
 
-  // Manipulador de upload de arquivo para o MinIO
+  // Criação de novo arquivo de texto
+  const handleCreateFile = async () => {
+    if (!newFileName.trim()) return;
+    setIsCreatingFile(true);
+    try {
+      const cleanName = newFileName.trim();
+      let initialContent = '';
+      if (cleanName.endsWith('.bib')) {
+        initialContent = '% Arquivo de Referências Bibliográficas BibTeX\n';
+      } else if (cleanName.endsWith('.tex')) {
+        initialContent = '% Módulo LaTeX complementar\n';
+      }
+
+      const res = await fetch(`${apiBase}/api/documents/${documentId}/files/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: cleanName,
+          content: initialContent,
+        }),
+      });
+
+      if (res.ok) {
+        const created: ProjectFile = await res.json();
+        const mapped: ProjectFile = {
+          id: created.id,
+          name: created.name || (created as any).path,
+          type: cleanName.endsWith('.bib') ? 'bib' : 'tex',
+          content: initialContent,
+        };
+        await fetchFiles();
+        setNewFileDialogOpen(false);
+        setNewFileName('');
+        if (onOpenFile) {
+          onOpenFile(mapped);
+        } else {
+          onSelectFile(mapped.name);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao criar arquivo:', err);
+    } finally {
+      setIsCreatingFile(false);
+    }
+  };
+
+  // Upload de arquivo / imagem para o MinIO
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -143,7 +201,7 @@ export function FileTreeSidebar({
     }
   };
 
-  // Extrai as seções do documento LaTeX dinamicamente para o Outline
+  // Extrai seções do documento LaTeX para o Outline
   const outlineItems = useMemo(() => {
     const lines = documentContent.split('\n');
     const items: { line: number; title: string; level: number }[] = [];
@@ -166,7 +224,7 @@ export function FileTreeSidebar({
   const getFileIcon = (file: ProjectFile) => {
     switch (file.type) {
       case 'tex':
-        return <FileCode size={15} style={{ color: 'var(--primary-main)' }} />;
+        return <FileCode size={15} style={{ color: 'var(--primary-main, #098842)' }} />;
       case 'bib':
         return <BookMarked size={15} style={{ color: '#f59e0b' }} />;
       case 'image':
@@ -196,14 +254,16 @@ export function FileTreeSidebar({
   };
 
   return (
-    <aside
-      className="ide-file-tree-panel"
-      style={{
-        width: '240px',
-        minWidth: '240px',
+    <Box
+      component="nav"
+      aria-label="Árvore de arquivos do projeto"
+      sx={{
+        width: 240,
+        minWidth: 240,
         height: '100%',
-        backgroundColor: 'var(--bg-paper)',
-        borderRight: '1px solid var(--border-color)',
+        backgroundColor: 'background.paper',
+        borderRight: 1,
+        borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -211,45 +271,58 @@ export function FileTreeSidebar({
       }}
     >
       {/* Input oculto para upload de arquivos */}
-      <input
+      <Box
+        component="input"
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
         multiple
         accept=".png,.jpg,.jpeg,.gif,.svg,.pdf,.bib,.sty,.cls"
-        style={{ display: 'none' }}
+        sx={{ display: 'none' }}
       />
 
       {/* Header da Sidebar */}
-      <div
-        style={{
-          height: '40px',
-          padding: '0 0.65rem 0 0.85rem',
-          display: 'flex',
+      <Stack
+        direction="row"
+        sx={{
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid var(--border-color)',
-          backgroundColor: 'var(--bg-paper)',
+          height: 40,
+          px: 1.2,
+          borderBottom: 1,
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
         }}
       >
-        <span
-          style={{
+        <Typography
+          variant="subtitle2"
+          sx={{
             fontSize: '0.78rem',
-            fontWeight: 650,
-            color: 'var(--text-primary)',
+            fontWeight: 700,
+            color: 'text.primary',
             letterSpacing: '-0.01em',
           }}
         >
           File Tree
-        </span>
+        </Typography>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+        <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+          <Tooltip title="Novo arquivo (.tex, .bib, .sty)" arrow>
+            <IconButton
+              size="small"
+              onClick={() => setNewFileDialogOpen(true)}
+              sx={{ width: 26, height: 26, color: 'text.secondary' }}
+            >
+              <FilePlus size={14} />
+            </IconButton>
+          </Tooltip>
+
           <Tooltip title={isUploading ? 'Fazendo upload...' : 'Upload de imagem/arquivo (MinIO)'} arrow>
             <IconButton
               size="small"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              sx={{ width: 26, height: 26, color: 'var(--primary-main)' }}
+              sx={{ width: 26, height: 26, color: 'primary.main' }}
             >
               <Upload size={14} />
             </IconButton>
@@ -259,81 +332,79 @@ export function FileTreeSidebar({
             <IconButton
               size="small"
               onClick={onClose}
-              sx={{ width: 26, height: 26, color: 'var(--text-secondary)' }}
+              sx={{ width: 26, height: 26, color: 'text.secondary' }}
             >
               <X size={14} />
             </IconButton>
           </Tooltip>
-        </div>
-      </div>
+        </Stack>
+      </Stack>
 
       {/* Lista de Arquivos */}
-      <div style={{ flex: '0 0 auto', padding: '0.5rem 0.35rem', overflowY: 'auto' }}>
+      <Box sx={{ flex: '0 0 auto', p: 0.75, overflowY: 'auto' }}>
         {allFiles.map((file) => {
           const isSelected = activeFile === file.name;
           return (
-            <div
+            <Box
               key={file.id}
               onClick={() => {
                 if (file.type === 'image') {
                   setSelectedImage(file);
+                } else if (onOpenFile) {
+                  onOpenFile(file);
                 } else {
                   onSelectFile(file.name);
                 }
               }}
-              style={{
+              sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.35rem 0.55rem',
-                borderRadius: '6px',
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
-                backgroundColor: isSelected
-                  ? 'rgba(9, 136, 66, 0.12)'
-                  : 'transparent',
-                color: isSelected
-                  ? 'var(--primary-main)'
-                  : 'var(--text-primary)',
+                backgroundColor: isSelected ? 'rgba(9, 136, 66, 0.12)' : 'transparent',
+                color: isSelected ? 'primary.main' : 'text.primary',
                 fontWeight: isSelected ? 600 : 400,
                 transition: 'background-color 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.08)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
+                '&:hover': {
+                  backgroundColor: isSelected ? 'rgba(9, 136, 66, 0.15)' : 'action.hover',
+                },
               }}
             >
               {getFileIcon(file)}
-              <span
-                style={{
+              <Typography
+                component="span"
+                sx={{
                   flex: 1,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
+                  fontSize: '0.78rem',
+                  fontWeight: 'inherit',
+                  color: 'inherit',
                 }}
               >
                 {file.name}
-              </span>
+              </Typography>
 
               {file.isMain && (
-                <span
-                  style={{
+                <Box
+                  component="span"
+                  sx={{
                     fontSize: '9px',
-                    padding: '1px 4px',
+                    px: 0.5,
+                    py: 0.1,
                     backgroundColor: 'rgba(9, 136, 66, 0.15)',
-                    color: 'var(--primary-main)',
-                    borderRadius: '4px',
-                    fontWeight: 600,
+                    color: 'primary.main',
+                    borderRadius: '3px',
+                    fontWeight: 700,
                   }}
                 >
                   main
-                </span>
+                </Box>
               )}
 
               {!file.isMain && (
@@ -344,104 +415,158 @@ export function FileTreeSidebar({
                     sx={{
                       width: 20,
                       height: 20,
-                      padding: 0,
+                      p: 0,
                       opacity: 0.5,
-                      '&:hover': { opacity: 1, color: '#ef4444' },
+                      '&:hover': { opacity: 1, color: 'error.main' },
                     }}
                   >
                     <Trash2 size={12} />
                   </IconButton>
                 </Tooltip>
               )}
-            </div>
+            </Box>
           );
         })}
-      </div>
+      </Box>
 
       {/* Divisor do Outline das Seções */}
-      <div
-        style={{
-          borderTop: '1px solid var(--border-color)',
-          marginTop: 'auto',
+      <Box
+        sx={{
+          borderTop: 1,
+          borderColor: 'divider',
+          mt: 'auto',
           flex: '1 1 auto',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '120px',
+          minHeight: 120,
           overflow: 'hidden',
         }}
       >
-        <div
-          style={{
-            height: '32px',
-            padding: '0 0.85rem',
-            display: 'flex',
+        <Stack
+          direction="row"
+          spacing={0.8}
+          sx={{
             alignItems: 'center',
-            gap: '0.4rem',
-            borderBottom: '1px solid var(--border-color)',
-            backgroundColor: 'var(--bg-paper)',
+            height: 32,
+            px: 1.2,
+            borderBottom: 1,
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
           }}
         >
           <ListTree size={14} style={{ color: 'var(--text-secondary)' }} />
-          <span style={{ fontSize: '0.72rem', fontWeight: 650, color: 'var(--text-secondary)' }}>
+          <Typography
+            variant="caption"
+            sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'text.secondary' }}
+          >
             Outline
-          </span>
-        </div>
+          </Typography>
+        </Stack>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0.4rem 0.35rem' }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 0.75 }}>
           {outlineItems.length === 0 ? (
-            <div
-              style={{
-                padding: '0.6rem 0.5rem',
+            <Typography
+              variant="caption"
+              sx={{
+                display: 'block',
+                p: 1,
                 fontSize: '0.72rem',
-                color: 'var(--text-secondary)',
+                color: 'text.secondary',
                 fontStyle: 'italic',
               }}
             >
               Nenhuma seção encontrada em {activeFile}
-            </div>
+            </Typography>
           ) : (
             outlineItems.map((item, idx) => (
-              <div
+              <Stack
                 key={idx}
-                style={{
-                  display: 'flex',
+                direction="row"
+                spacing={0.6}
+                sx={{
                   alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.25rem 0.45rem',
-                  paddingLeft: item.level === 2 ? '1.2rem' : '0.45rem',
+                  px: 0.8,
+                  py: 0.4,
+                  pl: item.level === 2 ? 2.5 : 0.8,
                   fontSize: '0.74rem',
-                  color: 'var(--text-secondary)',
+                  color: 'text.secondary',
                   cursor: 'pointer',
-                  borderRadius: '4px',
-                  lineHeight: 1.3,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.08)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
+                  borderRadius: 0.75,
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                    color: 'text.primary',
+                  },
                 }}
               >
-                <span
-                  style={{
+                <Typography
+                  component="span"
+                  sx={{
                     fontSize: '9px',
-                    color: 'var(--text-secondary)',
-                    minWidth: '18px',
-                    fontFamily: 'var(--font-mono)',
+                    color: 'text.disabled',
+                    minWidth: 18,
+                    fontFamily: 'fontFamilyMonospace',
                   }}
                 >
                   L{item.line}
-                </span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                </Typography>
+                <Typography
+                  component="span"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontSize: '0.74rem',
+                    color: 'inherit',
+                  }}
+                >
                   {item.title}
-                </span>
-              </div>
+                </Typography>
+              </Stack>
             ))
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
+
+      {/* Modal de Criação de Novo Arquivo */}
+      <Dialog
+        open={newFileDialogOpen}
+        onClose={() => setNewFileDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+          Novo Arquivo
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Nome do Arquivo"
+            placeholder="ex: references.bib ou chapter1.tex"
+            fullWidth
+            size="small"
+            value={newFileName}
+            onChange={(e) => setNewFileName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateFile();
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button size="small" onClick={() => setNewFileDialogOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="success"
+            disabled={!newFileName.trim() || isCreatingFile}
+            onClick={handleCreateFile}
+          >
+            {isCreatingFile ? 'Criando...' : 'Criar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Modal de Preview de Imagem & Snippet LaTeX */}
       <Dialog
@@ -455,47 +580,48 @@ export function FileTreeSidebar({
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
           {selectedImage && (
-            <div
-              style={{
+            <Box
+              sx={{
                 width: '100%',
-                maxHeight: '220px',
+                maxHeight: 220,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.05)',
-                borderRadius: '8px',
+                backgroundColor: 'action.hover',
+                borderRadius: 1,
                 overflow: 'hidden',
-                padding: '0.5rem',
+                p: 1,
               }}
             >
-              <img
+              <Box
+                component="img"
                 src={`${apiBase}/api/documents/${documentId}/files/${selectedImage.id}/raw`}
                 alt={selectedImage.name}
-                style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }}
+                sx={{ maxWidth: '100%', maxHeight: 200, objectFit: 'contain' }}
               />
-            </div>
+            </Box>
           )}
 
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             <strong>Tamanho:</strong>{' '}
             {selectedImage?.sizeBytes
               ? `${(selectedImage.sizeBytes / 1024).toFixed(1)} KB`
               : 'N/A'}
-          </div>
+          </Typography>
 
-          <div
-            style={{
-              padding: '0.5rem 0.6rem',
-              backgroundColor: 'rgba(128,128,128,0.1)',
-              borderRadius: '6px',
-              fontFamily: 'var(--font-mono)',
+          <Box
+            sx={{
+              p: 1,
+              backgroundColor: 'action.hover',
+              borderRadius: 1,
+              fontFamily: 'fontFamilyMonospace',
               fontSize: '0.75rem',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-all',
             }}
           >
             {`\\includegraphics[width=0.8\\linewidth]{${selectedImage?.name}}`}
-          </div>
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button size="small" onClick={() => setSelectedImage(null)}>
@@ -512,6 +638,6 @@ export function FileTreeSidebar({
           </Button>
         </DialogActions>
       </Dialog>
-    </aside>
+    </Box>
   );
 }

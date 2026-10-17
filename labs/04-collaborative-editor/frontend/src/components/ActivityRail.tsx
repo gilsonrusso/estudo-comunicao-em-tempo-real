@@ -6,8 +6,11 @@ import {
   Moon,
   FolderTree,
 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
+import Badge from '@mui/material/Badge';
 
 export type ActiveSidebarPanel = 'files' | 'search' | 'history' | null;
 
@@ -39,59 +42,52 @@ export function ActivityRail({
       id: 'files' as const,
       label: 'Arquivos do Projeto',
       icon: FolderTree,
-      badge: null,
+      badge: 0,
     },
     {
       id: 'search' as const,
       label: 'Buscar no Projeto',
       icon: Search,
-      badge: null,
+      badge: 0,
     },
     {
       id: 'history' as const,
       label: 'Histórico & Snapshots',
       icon: History,
-      badge: snapshotsCount > 0 ? snapshotsCount : null,
+      badge: snapshotsCount > 0 ? snapshotsCount : 0,
     },
   ];
 
   return (
-    <nav
-      className="ide-rail"
+    <Box
+      component="nav"
       aria-label="Activity Rail"
-      style={{
-        width: '44px',
-        minWidth: '44px',
+      sx={{
+        width: 44,
+        minWidth: 44,
         height: '100%',
-        backgroundColor: 'var(--bg-paper)',
-        borderRight: '1px solid var(--border-color)',
+        backgroundColor: 'background.paper',
+        borderRight: 1,
+        borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '0.5rem 0',
+        py: 1,
         zIndex: 20,
         userSelect: 'none',
       }}
     >
       {/* Top Group: Ferramentas do IDE */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.35rem',
-          width: '100%',
-        }}
-      >
+      <Stack spacing={0.5} sx={{ alignItems: 'center', width: '100%' }}>
         {topItems.map((item) => {
           const isActive = activePanel === item.id;
           const Icon = item.icon;
 
           return (
             <Tooltip key={item.id} title={item.label} placement="right" arrow>
-              <div
-                style={{
+              <Box
+                sx={{
                   position: 'relative',
                   width: '100%',
                   display: 'flex',
@@ -99,78 +95,62 @@ export function ActivityRail({
                 }}
               >
                 {isActive && (
-                  <span
-                    style={{
+                  <Box
+                    component="span"
+                    sx={{
                       position: 'absolute',
                       left: 0,
                       top: '15%',
                       bottom: '15%',
-                      width: '3px',
-                      backgroundColor: 'var(--primary-main)',
+                      width: 3,
+                      backgroundColor: 'primary.main',
                       borderRadius: '0 2px 2px 0',
                     }}
                   />
                 )}
-                <IconButton
-                  size="small"
-                  onClick={() => handlePanelClick(item.id)}
-                  aria-label={item.label}
+                <Badge
+                  badgeContent={item.badge}
+                  color="primary"
+                  invisible={item.badge === 0}
                   sx={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '6px',
-                    color: isActive
-                      ? 'var(--primary-main)'
-                      : 'var(--text-secondary)',
-                    backgroundColor: isActive
-                      ? 'rgba(9, 136, 66, 0.12)'
-                      : 'transparent',
-                    '&:hover': {
-                      backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                      color: 'var(--text-primary)',
+                    '& .MuiBadge-badge': {
+                      fontSize: '9px',
+                      height: 14,
+                      minWidth: 14,
+                      padding: '0 3px',
+                      right: 4,
+                      top: 4,
                     },
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
-                </IconButton>
-
-                {item.badge !== null && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '2px',
-                      right: '4px',
-                      backgroundColor: 'var(--primary-main)',
-                      color: '#ffffff',
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      padding: '0 4px',
-                      height: '14px',
-                      lineHeight: '14px',
-                      pointerEvents: 'none',
+                  <IconButton
+                    size="small"
+                    onClick={() => handlePanelClick(item.id)}
+                    aria-label={item.label}
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 1,
+                      color: isActive ? 'primary.main' : 'text.secondary',
+                      backgroundColor: isActive ? 'rgba(9, 136, 66, 0.12)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                        color: 'text.primary',
+                      },
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    {item.badge}
-                  </span>
-                )}
-              </div>
+                    <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+                  </IconButton>
+                </Badge>
+              </Box>
             </Tooltip>
           );
         })}
-      </div>
+      </Stack>
 
       {/* Bottom Group: Tema & Configurações */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.35rem',
-          width: '100%',
-        }}
-      >
+      <Stack spacing={0.5} sx={{ alignItems: 'center', width: '100%' }}>
         <Tooltip
           title={themeMode === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
           placement="right"
@@ -183,21 +163,14 @@ export function ActivityRail({
             sx={{
               width: 34,
               height: 34,
-              borderRadius: '6px',
-              color:
-                themeMode === 'dark'
-                  ? 'var(--yellow-40, #f59e0b)'
-                  : 'var(--blue-50, #3b82f6)',
+              borderRadius: 1,
+              color: themeMode === 'dark' ? '#f59e0b' : '#3b82f6',
               '&:hover': {
-                backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                backgroundColor: 'action.hover',
               },
             }}
           >
-            {themeMode === 'dark' ? (
-              <Sun size={18} />
-            ) : (
-              <Moon size={18} />
-            )}
+            {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </IconButton>
         </Tooltip>
 
@@ -208,18 +181,18 @@ export function ActivityRail({
             sx={{
               width: 34,
               height: 34,
-              borderRadius: '6px',
-              color: 'var(--text-secondary)',
+              borderRadius: 1,
+              color: 'text.secondary',
               '&:hover': {
-                backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                color: 'var(--text-primary)',
+                backgroundColor: 'action.hover',
+                color: 'text.primary',
               },
             }}
           >
             <Settings size={18} />
           </IconButton>
         </Tooltip>
-      </div>
-    </nav>
+      </Stack>
+    </Box>
   );
 }
