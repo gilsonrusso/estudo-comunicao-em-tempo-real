@@ -6,12 +6,14 @@ echo "🚀 Encaminhamento de Portas do Kubernetes (Kind)"
 echo "=========================================================="
 echo "• Frontend (CodeMirror + LaTeX): http://localhost:8080"
 echo "• Backend (Fastify + WebSockets): http://localhost:3334"
-echo "• Argo CD Web UI:                https://localhost:8443"
+echo "• MinIO Console (S3 Object Storage): http://localhost:9001 (minioadmin / minioadmin123)"
+echo "• Argo CD Web UI:                https://localhost:8443 (admin / -SQRYn2y7aF8moar)"
 echo "=========================================================="
 
 # Mata eventuais port-forwards anteriores nas mesmas portas
 pkill -f "port-forward.*8080" || true
 pkill -f "port-forward.*3334" || true
+pkill -f "port-forward.*9001" || true
 pkill -f "port-forward.*8443" || true
 
 # Inicia os port-forwards com auto-reconnect resiliente a reinicializações de pods
@@ -21,12 +23,15 @@ PID_FE=$!
 (while true; do kubectl port-forward -n collab-app svc/backend 3334:3333 > /dev/null 2>&1 || true; sleep 1; done) &
 PID_BE=$!
 
+(while true; do kubectl port-forward -n collab-app svc/minio 9001:9001 > /dev/null 2>&1 || true; sleep 1; done) &
+PID_MINIO=$!
+
 (while true; do kubectl port-forward -n argocd svc/argocd-server 8443:443 > /dev/null 2>&1 || true; sleep 1; done) &
 PID_ARGO=$!
 
 echo "✅ Port-forwards ativos!"
 echo "Pressione Ctrl+C para encerrar todos os port-forwards."
 
-trap "kill $PID_FE $PID_BE $PID_ARGO 2>/dev/null || true; exit 0" INT TERM EXIT
+trap "kill $PID_FE $PID_BE $PID_MINIO $PID_ARGO 2>/dev/null || true; exit 0" INT TERM EXIT
 
 wait
