@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 02: WebSocket Multi-Room Chat</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #131b2e;
+      --card-bg: #1c2640;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --bubble-mine: #4f46e5;
+      --bubble-other: #232f48;
+      --green: #10b981;
+      --border: #232f48;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Modal de Entrada */
+    .login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .login-card { background: var(--panel); border: 1px solid var(--border); padding: 2.5rem; border-radius: 1rem; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    .login-card h2 { margin-bottom: 0.5rem; font-size: 1.5rem; }
+    .login-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+    label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+    input, select { padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--bg); color: white; font-size: 1rem; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); }
+    .btn-primary { width: 100%; padding: 0.85rem; background: var(--accent); color: white; border: none; border-radius: 0.5rem; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    /* App Layout */
+    .app-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--panel); border-bottom: 1px solid var(--border); }
+    .app-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.2rem; font-weight: bold; }
+    .status-badge { font-size: 0.8rem; padding: 0.3rem 0.75rem; border-radius: 9999px; background: rgba(16, 185, 129, 0.2); color: var(--green); border: 1px solid var(--green); display: flex; align-items: center; gap: 0.4rem; }
+    .status-badge.offline { background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: #ef4444; }
+
+    .main-content { display: flex; flex: 1; height: calc(100vh - 65px); }
+
+    /* Sidebar */
+    .sidebar { width: 260px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1rem; gap: 1.5rem; }
+    .room-info { background: var(--bg); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border); }
+    .room-info h4 { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem; }
+    .room-info p { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
+    .users-list h4 { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.75rem; }
+    .users-container { display: flex; flex-direction: column; gap: 0.5rem; max-height: calc(100vh - 350px); overflow-y: auto; }
+    .user-tag { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.4rem 0.6rem; border-radius: 0.25rem; background: var(--card-bg); }
+    .user-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; }
+
+    /* Chat Area */
+    .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+    .messages-container { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+
+    .message-row { display: flex; flex-direction: column; max-width: 65%; }
+    .message-row.mine { align-self: flex-end; align-items: flex-end; }
+    .message-row.other { align-self: flex-start; align-items: flex-start; }
+    .message-author { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+    .message-bubble { padding: 0.75rem 1rem; border-radius: 1rem; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+    .message-row.mine .message-bubble { background: var(--bubble-mine); color: white; border-bottom-right-radius: 0.25rem; }
+    .message-row.other .message-bubble { background: var(--bubble-other); color: #e2e8f0; border-bottom-left-radius: 0.25rem; }
+    .message-time { font-size: 0.7rem; color: rgba(255,255,255,0.6); margin-top: 0.35rem; display: block; text-align: right; }
+
+    .system-notification { align-self: center; background: rgba(255,255,255,0.05); padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; color: var(--text-muted); }
+
+    .typing-box { height: 24px; padding: 0 1.5rem; font-size: 0.8rem; color: var(--accent); font-style: italic; }
+
+    .chat-input-bar { display: flex; gap: 0.75rem; padding: 1rem 1.5rem; background: var(--panel); border-top: 1px solid var(--border); }
+    .chat-input-bar input { flex: 1; }
+    .chat-input-bar button { padding: 0.75rem 1.5rem; background: var(--accent); color: white; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<!-- Modal de Login -->
+<div class="login-overlay" id="loginModal">
+  <div class="login-card">
+    <h2>💬 Entrar no WebSocket Chat</h2>
+    <p>Conecte-se para testar o protocolo WebSocket em tempo real.</p>
+    <div class="form-group">
+      <label>Seu Apelido / Nome</label>
+      <input type="text" id="usernameInput" placeholder="Ex: Alice" autofocus>
+    </div>
+    <div class="form-group">
+      <label>Escolha a Sala</label>
+      <select id="roomSelect">
+        <option value="geral">#geral</option>
+        <option value="tecnologia">#tecnologia</option>
+        <option value="random">#random</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="joinChat()">Conectar ao Chat</button>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="app-title">
+    <span>⚡ WebSocket Chat Lab</span>
+  </div>
+  <div class="status-badge" id="statusBadge">
+    <div class="user-dot"></div> Conectado
+  </div>
+</header>
+
+<!-- Main Chat -->
+<div class="main-content">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="room-info">
+      <h4>Sala Atual</h4>
+      <p id="currentRoomDisplay">#---</p>
+    </div>
+    <div class="users-list">
+      <h4>Membros Online (<span id="userCount">0</span>)</h4>
+      <div class="users-container" id="usersContainer"></div>
+    </div>
+    <button class="btn-primary" style="margin-top: auto; background: var(--card-bg);" onclick="location.reload()">Trocar de Sala</button>
+  </aside>
+
+  <!-- Área de Chat -->
+  <section class="chat-area">
+    <div class="messages-container" id="messagesContainer"></div>
+    <div class="typing-box" id="typingIndicator"></div>
+    <form class="chat-input-bar" onsubmit="sendMessage(event)">
+      <input type="text" id="messageInput" placeholder="Digite sua mensagem e pressione Enter..." autocomplete="off">
+      <button type="submit">Enviar</button>
+    </form>
+  </section>
+</div>
+
+<script>
+  let socket = null;
+  let currentUser = '';
+  let currentRoom = '';
+  let typingTimeout = null;
+
+  const loginModal = document.getElementById('loginModal');
+  const statusBadge = document.getElementById('statusBadge');
+  const messagesContainer = document.getElementById('messagesContainer');
+  const usersContainer = document.getElementById('usersContainer');
+  const currentRoomDisplay = document.getElementById('currentRoomDisplay');
+  const userCount = document.getElementById('userCount');
+  const typingIndicator = document.getElementById('typingIndicator');
+  const messageInput = document.getElementById('messageInput');
+
+  function initWebSocket() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    socket = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    socket.onopen = () => {
+      statusBadge.className = 'status-badge';
+      statusBadge.innerHTML = '<div class="user-dot"></div> Conectado';
+
+      // Envia evento de entrada na sala
+      socket.send(JSON.stringify({
+        type: 'JOIN_ROOM',
+        username: currentUser,
+        room: currentRoom
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      handleServerEvent(data);
+    };
+
+    socket.onclose = () => {
+      statusBadge.className = 'status-badge offline';
+      statusBadge.textContent = 'Desconectado (Tentando reconectar...)';
+      setTimeout(initWebSocket, 3000);
+    };
+
+    socket.onerror = (err) => {
+      console.error('Erro no WebSocket:', err);
+    };
+  }
+
+  function handleServerEvent(data) {
+    switch (data.type) {
+      case 'JOINED_SUCCESS':
+        currentRoomDisplay.textContent = '#' + data.room;
+        updateUsersList(data.users);
+        break;
+
+      case 'USER_JOINED':
+        renderSystemNotice(`${data.username} entrou na sala.`);
+        updateUsersList(data.users);
+        break;
+
+      case 'USER_LEFT':
+        renderSystemNotice(`${data.username} saiu da sala.`);
+        updateUsersList(data.users);
+        break;
+
+      case 'NEW_MESSAGE':
+        renderMessage(data);
+        break;
+
+      case 'USER_TYPING':
+        if (data.isTyping) {
+          typingIndicator.textContent = `${data.user} está digitando...`;
+        } else {
+          typingIndicator.textContent = '';
+        }
+        break;
+    }
+  }
+
+  function joinChat() {
+    const username = document.getElementById('usernameInput').value.trim();
+    const room = document.getElementById('roomSelect').value;
+    if (!username) return alert('Por favor, digite seu nome.');
+
+    currentUser = username;
+    currentRoom = room;
+    loginModal.style.display = 'none';
+
+    initWebSocket();
+  }
+
+  function sendMessage(e) {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(JSON.stringify({
+      type: 'CHAT_MESSAGE',
+      text
+    }));
+
+    messageInput.value = '';
+    notifyTyping(false);
+  }
+
+  // Notifica quando o usuário digita
+  messageInput.addEventListener('input', () => {
+    notifyTyping(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => notifyTyping(false), 1500);
+  });
+
+  function notifyTyping(isTyping) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: 'TYPING',
+        isTyping
+      }));
+    }
+  }
+
+  function renderMessage(msg) {
+    const isMine = msg.user === currentUser;
+    const row = document.createElement('div');
+    row.className = `message-row ${isMine ? 'mine' : 'other'}`;
+
+    row.innerHTML = `
+      ${!isMine ? `<span class="message-author">${msg.user}</span>` : ''}
+      <div class="message-bubble">
+        ${escapeHtml(msg.text)}
+        <span class="message-time">${msg.timestamp}</span>
+      </div>
+    `;
+
+    messagesContainer.appendChild(row);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function renderSystemNotice(text) {
+    const div = document.createElement('div');
+    div.className = 'system-notification';
+    div.textContent = text;
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function updateUsersList(users) {
+    usersContainer.innerHTML = '';
+    userCount.textContent = users.length;
+    users.forEach(u => {
+      const tag = document.createElement('div');
+      tag.className = 'user-tag';
+      tag.innerHTML = `<div class="user-dot"></div> <span>${escapeHtml(u)}${u === currentUser ? ' (você)' : ''}</span>`;
+      usersContainer.appendChild(tag);
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>

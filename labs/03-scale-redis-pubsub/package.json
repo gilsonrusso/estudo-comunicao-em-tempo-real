@@ -1,0 +1,15 @@
+{
+  "name": "lab-03-scale-redis-pubsub",
+  "version": "1.0.0",
+  "description": "Laboratório de escala horizontal com WebSockets e Redis Pub/Sub",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "redis": "^4.7.0",
+    "ws": "^8.18.0"
+  }
+}

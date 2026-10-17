@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: collab-app
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS documents (
+        id VARCHAR(100) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        version INT NOT NULL DEFAULT 1,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS document_operations (
+        id VARCHAR(100) PRIMARY KEY,
+        document_id VARCHAR(100) REFERENCES documents(id) ON DELETE CASCADE,
+        user_id VARCHAR(100) NOT NULL,
+        user_name VARCHAR(100) NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        position INT NOT NULL,
+        text TEXT,
+        length INT,
+        timestamp BIGINT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS document_snapshots (
+        id VARCHAR(100) PRIMARY KEY,
+        document_id VARCHAR(100) REFERENCES documents(id) ON DELETE CASCADE,
+        version INT NOT NULL,
+        content TEXT NOT NULL,
+        saved_by VARCHAR(100) NOT NULL,
+        reason VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    INSERT INTO documents (id, title, content, version, updated_at)
+    VALUES (
+        'doc-1',
+        'Artigo Científico em LaTeX: Sistemas Distribuídos em Tempo Real',
+        '\documentclass{article}
+    \usepackage[utf8]{inputenc}
+    \usepackage{amsmath}
+    \usepackage{geometry}
+    \geometry{a4paper, margin=1in}
+
+    \title{Distributed Real-Time Systems: A Study on Collaborative Editing and TeX Compilation}
+    \author{Alice Silva \and Bob Santos}
+    \date{\today}
+
+    \begin{document}
+
+    \maketitle
+
+    \begin{abstract}
+    Este artigo investiga os mecanismos de sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas (Redis + PostgreSQL). Demonstramos o desacoplamento de alta frequência via WebSockets e a compilação isolada de documentos LaTeX em um micro-serviço TeX Live dedicado no Kubernetes.
+    \end{abstract}
+
+    \section{Introdução}
+    Plataformas como o Overleaf revolucionaram a escrita científica ao permitir que múltiplos pesquisadores editem o mesmo documento simultaneamente.
+
+    \section{Fundamentação Teórica}
+    A convergência de operações concorrentes é garantida pelo modelo de Transformação Operacional:
+    \begin{equation}
+      T(op_1, op_2) = (op''_1, op''_2) \quad \text{onde} \quad op_1 \circ op''_2 \equiv op_2 \circ op''_1
+    \end{equation}
+
+    \section{Resultados e Conclusão}
+    A arquitetura desacoplada em contêineres e orquestrada pelo Kubernetes com Argo garante estabilidade e escalabilidade elástica.
+
+    \end{document}',
+        1,
+        NOW()
+    ) ON CONFLICT (id) DO NOTHING;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: collab-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collab-postgres
+  namespace: collab-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_DB
+              value: collab_db
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql-volume
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-sql-volume
+          configMap:
+            name: postgres-init-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: collab-app
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres

@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: latex-compilation-pipeline
+  namespace: collab-app
+spec:
+  entrypoint: compile-latex-article
+  arguments:
+    parameters:
+      - name: document-id
+        value: "doc-1"
+      - name: tex-source
+        value: "\\documentclass{article}\\begin{document}Hello Scientific World\\end{document}"
+
+  templates:
+    - name: compile-latex-article
+      steps:
+        # Etapa 1: Executa primeira passagem do pdflatex para gerar arquivos .aux e marcas de citação
+        - - name: pdflatex-initial-pass
+            template: run-pdflatex
+            arguments:
+              parameters:
+                - name: pass-number
+                  value: "1"
+
+        # Etapa 2: Executa passagem final do pdflatex gerando o PDF consolidado
+        - - name: pdflatex-final-pass
+            template: run-pdflatex
+            arguments:
+              parameters:
+                - name: pass-number
+                  value: "2"
+
+    - name: run-pdflatex
+      inputs:
+        parameters:
+          - name: pass-number
+      container:
+        image: 04-collaborative-editor-compiler:latest
+        imagePullPolicy: IfNotPresent
+        command: [sh, -c]
+        args:
+          - |
+            echo "=== Executando passagem {{inputs.parameters.pass-number}} no Pod efêmero ==="
+            mkdir -p /tmp/workdir
+            cd /tmp/workdir
+            echo '{{workflow.parameters.tex-source}}' > main.tex
+            pdflatex -interaction=nonstopmode -no-shell-escape main.tex
+            ls -la main.pdf
+        resources:
+          requests:
+            cpu: 500m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi

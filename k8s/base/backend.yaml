@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collab-backend
+  namespace: collab-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: 04-collaborative-editor-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3333
+          env:
+            - name: PORT
+              value: "3333"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: DATABASE_URL
+              value: "postgresql://postgres:postgres@postgres:5432/collab_db"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: COMPILER_URL
+              value: "http://compiler:4000"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: collab-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3333
+      targetPort: 3333
+  selector:
+    app: backend

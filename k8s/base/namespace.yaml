@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: collab-app
+  labels:
+    app.kubernetes.io/name: collaborative-latex-editor
+    app.kubernetes.io/part-of: overleaf-clone

@@ -1,0 +1,43 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: realtime-redis
+    ports:
+      - "6379:6379"
+    networks:
+      default:
+        aliases:
+          - redis
+          - realtime-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+  node-a:
+    build: .
+    container_name: realtime-node-a
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_NAME=Nó-A (Docker)
+      - REDIS_URL=redis://realtime-redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  node-b:
+    build: .
+    container_name: realtime-node-b
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - NODE_NAME=Nó-B (Docker)
+      - REDIS_URL=redis://realtime-redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+

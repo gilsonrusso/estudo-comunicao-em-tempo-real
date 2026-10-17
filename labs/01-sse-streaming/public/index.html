@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 01: Server-Sent Events (SSE)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 2rem; }
+    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+    h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 0.5rem; }
+    .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
+    .badge.connected { background: rgba(34, 197, 94, 0.2); color: var(--green); border: 1px solid var(--green); }
+    .badge.disconnected { background: rgba(239, 68, 68, 0.2); color: var(--red); border: 1px solid var(--red); }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; }
+    .card-title { font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .card-value { font-size: 1.75rem; font-weight: bold; color: var(--accent); }
+    
+    .section-title { font-size: 1.1rem; margin-bottom: 0.75rem; color: #e2e8f0; }
+    
+    .stream-box { background: #090d16; border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; min-height: 100px; font-family: monospace; line-height: 1.6; white-space: pre-wrap; color: #cbd5e1; }
+    .input-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    input { flex: 1; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: #090d16; color: white; outline: none; }
+    input:focus { border-color: var(--accent); }
+    button { padding: 0.75rem 1.5rem; background: var(--accent); color: #0f172a; border: none; border-radius: 0.5rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+
+    .notifications-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 180px; overflow-y: auto; }
+    .notif-item { background: #090d16; border-left: 4px solid var(--accent); padding: 0.75rem; border-radius: 0.25rem; font-size: 0.9rem; }
+    .notif-item small { color: var(--text-muted); display: block; margin-top: 0.25rem; }
+
+    .cursor { display: inline-block; width: 8px; height: 16px; background: var(--accent); animation: blink 1s infinite; vertical-align: middle; margin-left: 2px; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>⚡ Lab 01: Server-Sent Events (SSE)</h1>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Demonstração de streaming contínuo sobre HTTP padrão</p>
+    </div>
+    <div id="statusBadge" class="badge disconnected">● Desconectado</div>
+  </header>
+
+  <!-- Métricas em Tempo Real -->
+  <div>
+    <h2 class="section-title">📊 1. Métricas Contínuas via SSE (event: metric)</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">CPU do Servidor</div>
+        <div class="card-value" id="cpuVal">-- %</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Memória RAM</div>
+        <div class="card-value" id="ramVal">-- %</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Clientes Conectados</div>
+        <div class="card-value" id="clientsVal">--</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Último Timestamp</div>
+        <div class="card-value" style="font-size: 1.25rem;" id="timeVal">--:--:--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Streaming estilo LLM / IA -->
+  <div>
+    <h2 class="section-title">🤖 2. Streaming de Resposta estilo ChatGPT / Claude</h2>
+    <div class="input-group">
+      <input type="text" id="promptInput" placeholder="Faça uma pergunta para simular geração em streaming..." value="Explique as vantagens do Server-Sent Events">
+      <button onclick="startAiStreaming()">Gerar Resposta (Stream)</button>
+    </div>
+    <div class="stream-box" id="aiStreamOutput">Aguardando geração...</div>
+  </div>
+
+  <!-- Notificações em Tempo Real -->
+  <div>
+    <h2 class="section-title">🔔 3. Broadcast de Notificações Instantâneas</h2>
+    <div class="input-group">
+      <input type="text" id="notifInput" placeholder="Digite uma mensagem de alerta...">
+      <button style="background: var(--green); color: black;" onclick="broadcastNotification()">Enviar Alerta Global</button>
+    </div>
+    <div class="notifications-list" id="notifList"></div>
+  </div>
+</div>
+
+<script>
+  let eventSource = null;
+  const statusBadge = document.getElementById('statusBadge');
+  const cpuVal = document.getElementById('cpuVal');
+  const ramVal = document.getElementById('ramVal');
+  const clientsVal = document.getElementById('clientsVal');
+  const timeVal = document.getElementById('timeVal');
+  const notifList = document.getElementById('notifList');
+
+  // Inicializa a conexão SSE usando a API nativa EventSource
+  function initSSE() {
+    eventSource = new EventSource('/api/events/stream');
+
+    eventSource.onopen = () => {
+      statusBadge.textContent = '● Conectado (SSE)';
+      statusBadge.className = 'badge connected';
+    };
+
+    eventSource.onerror = (err) => {
+      statusBadge.textContent = '● Reconectando...';
+      statusBadge.className = 'badge disconnected';
+    };
+
+    // Escuta evento customizado 'welcome'
+    eventSource.addEventListener('welcome', (e) => {
+      const data = JSON.parse(e.data);
+      console.log('[SSE Boas-vindas]:', data);
+    });
+
+    // Escuta evento customizado 'metric'
+    eventSource.addEventListener('metric', (e) => {
+      const metric = JSON.parse(e.data);
+      cpuVal.textContent = metric.cpu + ' %';
+      ramVal.textContent = metric.memory + ' %';
+      clientsVal.textContent = metric.activeConnections;
+      timeVal.textContent = metric.timestamp;
+    });
+
+    // Escuta evento customizado 'notification'
+    eventSource.addEventListener('notification', (e) => {
+      const notif = JSON.parse(e.data);
+      const item = document.createElement('div');
+      item.className = 'notif-item';
+      item.innerHTML = `<strong>${notif.title}</strong>: ${notif.message} <small>Recebido às ${notif.time}</small>`;
+      notifList.prepend(item);
+    });
+  }
+
+  // Streaming de IA usando fetch() com leitura de ReadableStream
+  async function startAiStreaming() {
+    const prompt = document.getElementById('promptInput').value;
+    const output = document.getElementById('aiStreamOutput');
+    output.innerHTML = '<span class="cursor"></span>';
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.replace('data: ', '').trim();
+            if (!dataStr) continue;
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.token) {
+                textBuffer += data.token;
+                output.innerHTML = textBuffer + '<span class="cursor"></span>';
+              }
+            } catch (err) {}
+          }
+        }
+      }
+      output.innerHTML = textBuffer; // Remove cursor ao finalizar
+    } catch (err) {
+      output.textContent = 'Erro ao receber stream: ' + err.message;
+    }
+  }
+
+  // Dispara notificação via POST REST
+  async function broadcastNotification() {
+    const input = document.getElementById('notifInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Notificação do Usuário', message })
+    });
+    input.value = '';
+  }
+
+  // Inicia ao carregar a página
+  initSSE();
+</script>
+
+</body>
+</html>
