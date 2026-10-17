@@ -14,14 +14,14 @@ pkill -f "port-forward.*8080" || true
 pkill -f "port-forward.*3334" || true
 pkill -f "port-forward.*8443" || true
 
-# Inicia os port-forwards em background
-kubectl port-forward -n collab-app svc/frontend 8080:80 > /dev/null 2>&1 &
+# Inicia os port-forwards com auto-reconnect resiliente a reinicializações de pods
+(while true; do kubectl port-forward -n collab-app svc/frontend 8080:80 > /dev/null 2>&1 || true; sleep 1; done) &
 PID_FE=$!
 
-kubectl port-forward -n collab-app svc/backend 3334:3333 > /dev/null 2>&1 &
+(while true; do kubectl port-forward -n collab-app svc/backend 3334:3333 > /dev/null 2>&1 || true; sleep 1; done) &
 PID_BE=$!
 
-kubectl port-forward -n argocd svc/argocd-server 8443:443 > /dev/null 2>&1 &
+(while true; do kubectl port-forward -n argocd svc/argocd-server 8443:443 > /dev/null 2>&1 || true; sleep 1; done) &
 PID_ARGO=$!
 
 echo "✅ Port-forwards ativos!"
