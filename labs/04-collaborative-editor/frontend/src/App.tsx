@@ -390,6 +390,27 @@ export function App() {
     }
   };
 
+  const handleInsertSnippet = (snippet: string) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && documentData) {
+      const insertPos = documentData.content.indexOf('\\end{document}');
+      const pos = insertPos !== -1 ? insertPos : documentData.content.length;
+      const delta = {
+        type: 'insert' as const,
+        position: pos,
+        text: `\n${snippet}\n`,
+        userId,
+        userName,
+        timestamp: Date.now(),
+      };
+      socketRef.current.send(
+        JSON.stringify({
+          type: 'APPLY_DELTA',
+          delta,
+        })
+      );
+    }
+  };
+
   if (!documentData) {
     return (
       <div
@@ -464,13 +485,16 @@ export function App() {
           snapshotsCount={snapshots.length}
         />
 
-        {/* Sidebar Panel: File Tree (Colapsável) */}
+        {/* Sidebar Panel: File Tree (Colapsável com MinIO) */}
         {activeSidebarPanel === 'files' && (
           <FileTreeSidebar
+            documentId={documentData.id}
+            apiBase={API_BASE}
             activeFile={activeFile}
             onSelectFile={setActiveFile}
             onClose={() => setActiveSidebarPanel(null)}
             documentContent={documentData.content}
+            onInsertSnippet={handleInsertSnippet}
           />
         )}
 

@@ -61,3 +61,21 @@ export const CreateDocumentBodySchema = z.object({
   title: z.string().min(1),
   initialContent: z.string().default(''),
 });
+
+export const ProjectFileSchema = z.object({
+  id: z.string(),
+  documentId: z.string(),
+  path: z.string(),
+  fileType: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number(),
+  storageKey: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type ProjectFile = z.infer<typeof ProjectFileSchema>;
+
+export const FileParamsSchema = z.object({
+  documentId: z.string(),
+  fileId: z.string(),
+});

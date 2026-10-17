@@ -7,6 +7,8 @@ import {
   DocumentSnapshotSchema,
   DocumentOperationSchema,
   GetDocumentParamsSchema,
+  ProjectFileSchema,
+  FileParamsSchema,
 } from './documents.schema.js';
 
 export const documentsRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -109,5 +111,63 @@ export const documentsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     controller.compile.bind(controller)
+  );
+
+  // Listar arquivos do projeto
+  fastify.get(
+    '/api/documents/:documentId/files',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Listar arquivos do projeto LaTeX',
+        params: GetDocumentParamsSchema,
+        response: {
+          200: z.array(ProjectFileSchema),
+        },
+      },
+    },
+    controller.listFiles.bind(controller)
+  );
+
+  // Upload de arquivo / imagem (multipart)
+  fastify.post(
+    '/api/documents/:documentId/files/upload',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Fazer upload de arquivo ou imagem para o MinIO',
+        params: GetDocumentParamsSchema,
+      },
+    },
+    controller.uploadFile.bind(controller)
+  );
+
+  // Obter stream binário da imagem/arquivo
+  fastify.get(
+    '/api/documents/:documentId/files/:fileId/raw',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Obter stream binário do arquivo',
+        params: FileParamsSchema,
+      },
+    },
+    controller.getFileRaw.bind(controller)
+  );
+
+  // Deletar arquivo do projeto
+  fastify.delete(
+    '/api/documents/:documentId/files/:fileId',
+    {
+      schema: {
+        tags: ['Documents', 'Files'],
+        summary: 'Excluir arquivo do projeto',
+        params: FileParamsSchema,
+        response: {
+          200: z.object({ message: z.string() }),
+        },
+      },
+    },
+    controller.deleteFile.bind(controller)
   );
 };

@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - postgres.yaml
   - redis.yaml
+  - minio.yaml
   - compiler.yaml
   - backend.yaml
   - frontend.yaml

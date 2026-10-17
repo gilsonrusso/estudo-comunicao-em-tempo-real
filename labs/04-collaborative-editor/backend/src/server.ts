@@ -1,5 +1,6 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import {
   serializerCompiler,
@@ -9,12 +10,14 @@ import {
 import { documentsRoutes } from './modules/documents/documents.routes.js';
 import { documentsWebSocketPlugin } from './modules/documents/documents.websocket.js';
 import { initRedis } from './infra/redis.js';
+import { initS3 } from './infra/s3.js';
 
 const PORT = parseInt(process.env.PORT || '3333', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Inicializa o cluster Redis
+// Inicializa o cluster Redis e o MinIO S3
 await initRedis();
+await initS3();
 
 const app = fastify({
   logger: {
@@ -36,6 +39,12 @@ app.setSerializerCompiler(serializerCompiler);
 // Plugins de infraestrutura
 await app.register(cors, {
   origin: true, // Permite conexões do frontend React Vite (ex: localhost:5173)
+});
+
+await app.register(multipart, {
+  limits: {
+    fileSize: 25 * 1024 * 1024, // Limite de 25 MB por imagem/ativo
+  },
 });
 
 await app.register(websocket, {

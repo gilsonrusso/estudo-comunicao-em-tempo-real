@@ -74,4 +74,73 @@ export class DocumentsController {
       });
     }
   }
+
+  async listFiles(
+    request: FastifyRequest<{ Params: { documentId: string } }>,
+    reply: FastifyReply
+  ) {
+    const { documentId } = request.params;
+    const files = await this.service.listProjectFiles(documentId);
+    return reply.status(200).send(files);
+  }
+
+  async uploadFile(
+    request: FastifyRequest<{ Params: { documentId: string } }>,
+    reply: FastifyReply
+  ) {
+    const { documentId } = request.params;
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: 'Nenhum arquivo enviado no formulário multipart' });
+    }
+
+    const buffer = await data.toBuffer();
+    const customPath = (data.fields as Record<string, { value?: string }>).path?.value;
+    const filePath = customPath || data.filename;
+
+    try {
+      const projectFile = await this.service.uploadProjectFile(
+        documentId,
+        filePath,
+        buffer,
+        data.mimetype
+      );
+      return reply.status(201).send(projectFile);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(500).send({ error: `Erro no upload: ${error.message}` });
+    }
+  }
+
+  async getFileRaw(
+    request: FastifyRequest<{ Params: { documentId: string; fileId: string } }>,
+    reply: FastifyReply
+  ) {
+    const { fileId } = request.params;
+    try {
+      const { buffer, mimeType, path } = await this.service.getProjectFileRaw(fileId);
+      const filename = path.split('/').pop() || 'file';
+      return reply
+        .header('Content-Type', mimeType)
+        .header('Content-Disposition', `inline; filename="${filename}"`)
+        .send(buffer);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(404).send({ error: error.message });
+    }
+  }
+
+  async deleteFile(
+    request: FastifyRequest<{ Params: { documentId: string; fileId: string } }>,
+    reply: FastifyReply
+  ) {
+    const { fileId } = request.params;
+    try {
+      await this.service.deleteProjectFile(fileId);
+      return reply.status(200).send({ message: 'Arquivo excluído com sucesso' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(500).send({ error: error.message });
+    }
+  }
 }

@@ -25,18 +25,27 @@ fastify.get('/health', async () => {
   };
 });
 
+interface CompileFileItem {
+  path: string;
+  type?: 'text' | 'binary_base64' | 'binary_url';
+  content?: string;
+  url?: string;
+}
+
 interface CompileRequestBody {
-  content: string;
   documentId?: string;
+  mainEntry?: string; // padrão: 'main.tex'
+  content?: string;   // retrocompatibilidade para chamada simples com 1 arquivo
+  files?: CompileFileItem[];
 }
 
 fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) => {
-  const { content, documentId = 'doc' } = request.body || {};
+  const { content, files, mainEntry = 'main.tex', documentId = 'doc' } = request.body || {};
 
-  if (!content || typeof content !== 'string') {
+  if (!content && (!files || files.length === 0)) {
     return reply.status(400).send({
       success: false,
-      error: 'O corpo da requisição deve conter a propriedade "content" com o código LaTeX.',
+      error: 'O corpo da requisição deve conter "content" ou a lista "files" com os arquivos do projeto LaTeX.',
     });
   }
 
@@ -46,12 +55,45 @@ fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) =>
   try {
     // 1. Cria diretório efêmero isolado para esta compilação
     await fs.mkdir(sandboxDir, { recursive: true });
-    const texPath = path.join(sandboxDir, 'main.tex');
-    await fs.writeFile(texPath, content, 'utf-8');
 
-    request.log.info({ jobId, documentId }, 'Iniciando compilação LaTeX em sandbox');
+    // 2. Prepara os arquivos no sandbox
+    if (files && files.length > 0) {
+      for (const file of files) {
+        // Prevenção de Path Traversal
+        const safeRelativePath = path.normalize(file.path).replace(/^(\.\.[\/\\])+/, '');
+        const targetPath = path.join(sandboxDir, safeRelativePath);
+        await fs.mkdir(path.dirname(targetPath), { recursive: true });
 
-    // 2. Executa pdflatex com proteções de segurança
+        if (file.type === 'binary_url' && file.url) {
+          try {
+            const res = await fetch(file.url);
+            if (!res.ok) {
+              request.log.warn({ url: file.url, status: res.status }, 'Falha ao baixar asset do MinIO');
+              continue;
+            }
+            const arrayBuffer = await res.arrayBuffer();
+            await fs.writeFile(targetPath, Buffer.from(arrayBuffer));
+          } catch (downloadErr) {
+            request.log.error({ err: downloadErr, file: file.path }, 'Erro ao baixar asset remoto');
+          }
+        } else if (file.type === 'binary_base64' && file.content) {
+          await fs.writeFile(targetPath, Buffer.from(file.content, 'base64'));
+        } else {
+          await fs.writeFile(targetPath, file.content || '', 'utf-8');
+        }
+      }
+    } else if (content) {
+      const texPath = path.join(sandboxDir, 'main.tex');
+      await fs.writeFile(texPath, content, 'utf-8');
+    }
+
+    const safeMainEntry = path.normalize(mainEntry).replace(/^(\.\.[\/\\])+/, '');
+    const entryFullPath = path.join(sandboxDir, safeMainEntry);
+    const entryBaseName = path.parse(safeMainEntry).name;
+
+    request.log.info({ jobId, documentId, mainEntry: safeMainEntry, filesCount: files?.length || 1 }, 'Iniciando compilação LaTeX em sandbox');
+
+    // 3. Executa pdflatex com proteções de segurança
     // -no-shell-escape: Bloqueia comandos do terminal (\write18)
     // -interaction=nonstopmode: Não pausa solicitando entrada interativa no terminal
     const compileResult = await new Promise<{ exitCode: number; stdout: string; stderr: string }>(
@@ -65,7 +107,7 @@ fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) =>
             '-interaction=nonstopmode',
             '-no-shell-escape',
             `-output-directory=${sandboxDir}`,
-            texPath,
+            entryFullPath,
           ],
           {
             timeout: 25000, // Timeout rígido de 25 segundos
@@ -92,8 +134,8 @@ fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) =>
       }
     );
 
-    const pdfPath = path.join(sandboxDir, 'main.pdf');
-    const logPath = path.join(sandboxDir, 'main.log');
+    const pdfPath = path.join(sandboxDir, `${entryBaseName}.pdf`);
+    const logPath = path.join(sandboxDir, `${entryBaseName}.log`);
 
     let pdfExists = false;
     try {

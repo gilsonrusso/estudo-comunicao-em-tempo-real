@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { Document, DocumentOperation, DocumentSnapshot } from './documents.schema.js';
+import { Document, DocumentOperation, DocumentSnapshot, ProjectFile } from './documents.schema.js';
 
 const { Pool } = pg;
 
@@ -12,6 +12,10 @@ export interface IDocumentsRepository {
   getOperations(documentId: string): Promise<DocumentOperation[]>;
   createSnapshot(snapshot: DocumentSnapshot): Promise<DocumentSnapshot>;
   getSnapshots(documentId: string): Promise<DocumentSnapshot[]>;
+  listProjectFiles(documentId: string): Promise<ProjectFile[]>;
+  findProjectFileById(fileId: string): Promise<ProjectFile | null>;
+  saveProjectFile(file: ProjectFile): Promise<ProjectFile>;
+  deleteProjectFile(fileId: string): Promise<void>;
 }
 
 export class PostgresDocumentsRepository implements IDocumentsRepository {
@@ -112,5 +116,53 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
       ...row,
       createdAt: new Date(row.createdAt).toISOString(),
     }));
+  }
+
+  async listProjectFiles(documentId: string): Promise<ProjectFile[]> {
+    const res = await this.pool.query(
+      `SELECT id, document_id as "documentId", path, file_type as "fileType", mime_type as "mimeType",
+              size_bytes as "sizeBytes", storage_key as "storageKey", created_at as "createdAt"
+       FROM project_files WHERE document_id = $1 ORDER BY path ASC`,
+      [documentId]
+    );
+    return res.rows.map((row) => ({
+      ...row,
+      sizeBytes: Number(row.sizeBytes),
+      createdAt: new Date(row.createdAt).toISOString(),
+    }));
+  }
+
+  async findProjectFileById(fileId: string): Promise<ProjectFile | null> {
+    const res = await this.pool.query(
+      `SELECT id, document_id as "documentId", path, file_type as "fileType", mime_type as "mimeType",
+              size_bytes as "sizeBytes", storage_key as "storageKey", created_at as "createdAt"
+       FROM project_files WHERE id = $1`,
+      [fileId]
+    );
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+    return {
+      ...row,
+      sizeBytes: Number(row.sizeBytes),
+      createdAt: new Date(row.createdAt).toISOString(),
+    };
+  }
+
+  async saveProjectFile(file: ProjectFile): Promise<ProjectFile> {
+    await this.pool.query(
+      `INSERT INTO project_files (id, document_id, path, file_type, mime_type, size_bytes, storage_key, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (document_id, path) DO UPDATE SET
+         file_type = EXCLUDED.file_type,
+         mime_type = EXCLUDED.mime_type,
+         size_bytes = EXCLUDED.size_bytes,
+         storage_key = EXCLUDED.storage_key`,
+      [file.id, file.documentId, file.path, file.fileType, file.mimeType, file.sizeBytes, file.storageKey, file.createdAt]
+    );
+    return file;
+  }
+
+  async deleteProjectFile(fileId: string): Promise<void> {
+    await this.pool.query(`DELETE FROM project_files WHERE id = $1`, [fileId]);
   }
 }

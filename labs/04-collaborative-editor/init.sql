@@ -29,6 +29,18 @@ CREATE TABLE IF NOT EXISTS document_snapshots (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS project_files (
+    id VARCHAR(100) PRIMARY KEY,
+    document_id VARCHAR(100) REFERENCES documents(id) ON DELETE CASCADE,
+    path VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    storage_key VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(document_id, path)
+);
+
 -- Seed do documento padrão (Artigo Científico em LaTeX)
 INSERT INTO documents (id, title, content, version, updated_at)
 VALUES (
@@ -37,6 +49,7 @@ VALUES (
     '\documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
+\usepackage{graphicx}
 \usepackage{geometry}
 \geometry{a4paper, margin=1in}
 
@@ -49,7 +62,7 @@ VALUES (
 \maketitle
 
 \begin{abstract}
-Este artigo investiga os mecanismos de sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas (Redis + PostgreSQL). Demonstramos o desacoplamento de alta frequência via WebSockets e a compilação isolada de documentos LaTeX em um micro-serviço TeX Live dedicado.
+Este artigo investiga os mecanismos de sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas (Redis + PostgreSQL). Demonstramos o desacoplamento de alta frequência via WebSockets e a compilação isolada de documentos LaTeX em um micro-serviço TeX Live dedicado com suporte a imagens no MinIO S3.
 \end{abstract}
 
 \section{Introdução}
@@ -63,8 +76,18 @@ A convergência de operações concorrentes é garantida pelo modelo de Transfor
 
 Quando o usuário para de digitar, um gatilho de debounce consolida as operações atômicas em um snapshot persistido.
 
+\section{Arquitetura e Suporte a Múltiplos Ativos}
+A separação do compilador em um pool elástico de contêineres permite que ativos binários (figuras, fontes, pacotes de estilo) sejam armazenados em Object Storage (MinIO/S3) e injetados de forma sob demanda no sandbox de compilação:
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\linewidth]{architecture.png}
+  \caption{Topologia de microsserviços com MinIO S3 e compilador isolado em sandbox efêmero.}
+  \label{fig:architecture}
+\end{figure}
+
 \section{Resultados e Conclusão}
-A separação do compilador em um pool elástico de contêineres permite atingir latência inferior a 10ms para broadcast de cursores e carets remotos, mantendo a capacidade de gerar PDFs científicos com qualidade tipográfica de publicação.
+A integração entre OT via WebSockets, MinIO S3 e o micro-serviço TeX Live atinge latência inferior a 10ms para broadcast de cursores remotos, gerando PDFs vetoriais com figuras de alta qualidade sem sobrecarregar o banco de dados principal.
 
 \end{document}',
     1,

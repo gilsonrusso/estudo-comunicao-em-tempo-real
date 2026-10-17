@@ -4,12 +4,19 @@ import {
   DeltaOperation,
   DocumentOperation,
   DocumentSnapshot,
+  ProjectFile,
 } from './documents.schema.js';
 import {
   IDocumentsRepository,
   PostgresDocumentsRepository,
 } from './documents.repository.js';
 import { redisPubClient } from '../../infra/redis.js';
+import {
+  uploadToS3,
+  getFromS3,
+  deleteFromS3,
+  getInternalS3Url,
+} from '../../infra/s3.js';
 
 // Repositório conectado ao PostgreSQL
 export const defaultDocumentsRepository = new PostgresDocumentsRepository();
@@ -191,11 +198,125 @@ export class DocumentsService {
   }
 
   /**
-   * Delega a compilação do conteúdo atual do documento para o micro-serviço TeX Live
+   * Lista todos os arquivos do projeto (árvore de diretórios virtual)
+   */
+  async listProjectFiles(documentId: string): Promise<ProjectFile[]> {
+    return this.repository.listProjectFiles(documentId);
+  }
+
+  /**
+   * Realiza upload de arquivo/imagem para o MinIO e registra no banco relacional
+   */
+  async uploadProjectFile(
+    documentId: string,
+    virtualPath: string,
+    buffer: Buffer,
+    mimeType: string
+  ): Promise<ProjectFile> {
+    // Normaliza o caminho (ex: "images/grafico.png")
+    const cleanPath = virtualPath.replace(/^\/+/, '');
+    const ext = cleanPath.split('.').pop()?.toLowerCase() || '';
+
+    let fileType: string = 'other';
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) {
+      fileType = 'image';
+    } else if (ext === 'bib') {
+      fileType = 'bib';
+    } else if (['sty', 'cls'].includes(ext)) {
+      fileType = 'style';
+    } else if (ext === 'tex') {
+      fileType = 'tex';
+    }
+
+    const fileId = randomUUID();
+    const storageKey = `${documentId}/${fileId}-${cleanPath.split('/').pop()}`;
+
+    // 1. Salva o blob no MinIO S3
+    await uploadToS3(storageKey, buffer, mimeType);
+
+    // 2. Persiste metadados na tabela project_files
+    const projectFile: ProjectFile = {
+      id: fileId,
+      documentId,
+      path: cleanPath,
+      fileType,
+      mimeType,
+      sizeBytes: buffer.length,
+      storageKey,
+      createdAt: new Date().toISOString(),
+    };
+
+    return this.repository.saveProjectFile(projectFile);
+  }
+
+  /**
+   * Obtém o conteúdo binário de um arquivo armazenado no MinIO
+   */
+  async getProjectFileRaw(fileId: string): Promise<{ buffer: Buffer; mimeType: string; path: string }> {
+    const file = await this.repository.findProjectFileById(fileId);
+    if (!file || !file.storageKey) {
+      throw new Error(`Arquivo ${fileId} não encontrado`);
+    }
+
+    const { buffer, contentType } = await getFromS3(file.storageKey);
+    return {
+      buffer,
+      mimeType: file.mimeType || contentType,
+      path: file.path,
+    };
+  }
+
+  /**
+   * Remove arquivo do MinIO e do banco de dados
+   */
+  async deleteProjectFile(fileId: string): Promise<void> {
+    const file = await this.repository.findProjectFileById(fileId);
+    if (!file) return;
+
+    if (file.storageKey) {
+      try {
+        await deleteFromS3(file.storageKey);
+      } catch (err) {
+        console.warn(`[MinIO S3] Falha ao deletar objeto ${file.storageKey}:`, err);
+      }
+    }
+
+    await this.repository.deleteProjectFile(fileId);
+  }
+
+  /**
+   * Delega a compilação do documento LaTeX com suporte a múltiplos arquivos e imagens para o micro-serviço TeX Live
    */
   async compileDocument(documentId: string): Promise<Buffer> {
     const doc = await this.getDocument(documentId);
     const compilerUrl = process.env.COMPILER_URL || 'http://compiler:4000';
+
+    // Busca todos os arquivos associados ao projeto no PostgreSQL
+    const projectFiles = await this.repository.listProjectFiles(documentId);
+
+    // Constrói o manifesto de arquivos para o sandbox do compilador
+    const filesPayload: Array<{
+      path: string;
+      type: 'text' | 'binary_url';
+      content?: string;
+      url?: string;
+    }> = [
+      {
+        path: 'main.tex',
+        type: 'text',
+        content: doc.content,
+      },
+    ];
+
+    for (const file of projectFiles) {
+      if (file.storageKey) {
+        filesPayload.push({
+          path: file.path,
+          type: 'binary_url',
+          url: getInternalS3Url(file.storageKey),
+        });
+      }
+    }
 
     const response = await fetch(`${compilerUrl}/compile`, {
       method: 'POST',
@@ -203,8 +324,9 @@ export class DocumentsService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        content: doc.content,
         documentId,
+        mainEntry: 'main.tex',
+        files: filesPayload,
       }),
     });
 
