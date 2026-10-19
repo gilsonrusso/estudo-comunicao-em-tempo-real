@@ -2,6 +2,9 @@
 
 Guia de estudos e repositório prático sobre técnicas, arquiteturas e protocolos de comunicação em tempo real (*real-time web*).
 
+> 🎤 **Apresentação Técnica da Arquitetura (Lab 04 & Kubernetes GitOps):**  
+> Acesse o roteiro completo de apresentação técnica, diagramas C4, justificativas ("Por que das escolhas"), ADRs e Live Demo em **[APRESENTACAO_ARQUITETURA.md](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/APRESENTACAO_ARQUITETURA.md)** ou no [Guia Detalhado da Apresentação](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/05-apresentacao-arquitetura-lab04-e-k8s.md).
+
 ---
 
 ## 🗺️ Mapa da Trilha de Aprendizado
@@ -54,6 +57,7 @@ flowchart TD
 - [02. Cursores Remotos e Atribuição de Autoria em Tempo Real](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/02-cursores-e-presenca-colaborativa.md)
 - [03. Estudo de Caso de Produção: Arquitetura do Overleaf (ShareLaTeX)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/03-estudo-de-caso-overleaf.md)
 - [04. Arquitetura Detalhada: Editor Colaborativo de Artigos Científicos (Overleaf Clone)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/04-arquitetura-overleaf-clone.md)
+- [05. Roteiro de Apresentação Técnica: Arquitetura do Lab 04 & Kubernetes GitOps](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/05-apresentacao-arquitetura-lab04-e-k8s.md)
 - [Lab 01: Server-Sent Events (SSE)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/01-sse-streaming/README.md)
 - [Lab 02: WebSocket Chat com Salas e Presença](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/02-websocket-chat/README.md)
 - [Lab 03: Escala Horizontal Multi-Nó com Redis e Docker](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/03-scale-redis-pubsub/README.md)
