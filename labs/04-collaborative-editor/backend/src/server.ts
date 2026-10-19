@@ -2,22 +2,22 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
-import {
-  serializerCompiler,
-  validatorCompiler,
-  ZodTypeProvider,
-} from 'fastify-type-provider-zod';
+import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { documentsRoutes } from './modules/documents/documents.routes.js';
+import { templatesRoutes } from './modules/templates/templates.routes.js';
+import { languageToolRoutes } from './modules/languagetool/languagetool.routes.js';
 import { documentsWebSocketPlugin } from './modules/documents/documents.websocket.js';
 import { initRedis } from './infra/redis.js';
-import { initS3 } from './infra/s3.js';
+import { initMinio } from './infra/minio.js';
+import { seedBuiltinTemplates } from './modules/templates/templates.seeder.js';
 
 const PORT = parseInt(process.env.PORT || '3333', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Inicializa o cluster Redis e o MinIO S3
+// Inicializa o cluster Redis, o bucket do MinIO e provisiona os pacotes oficiais de templates
 await initRedis();
-await initS3();
+await initMinio();
+await seedBuiltinTemplates();
 
 const app = fastify({
   logger: {
@@ -54,7 +54,9 @@ await app.register(websocket, {
 });
 
 // Rotas da aplicação
+await app.register(templatesRoutes);
 await app.register(documentsRoutes);
+await app.register(languageToolRoutes);
 await app.register(documentsWebSocketPlugin);
 
 // Healthcheck

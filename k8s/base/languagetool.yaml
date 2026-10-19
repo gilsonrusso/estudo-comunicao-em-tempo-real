@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collab-languagetool
+  namespace: collab-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: languagetool
+  template:
+    metadata:
+      labels:
+        app: languagetool
+    spec:
+      containers:
+        - name: languagetool
+          image: erikvl87/languagetool:6.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8010
+          env:
+            - name: Java_Xms
+              value: "256m"
+            - name: Java_Xmx
+              value: "1g"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: languagetool
+  namespace: collab-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8010
+  selector:
+    app: languagetool

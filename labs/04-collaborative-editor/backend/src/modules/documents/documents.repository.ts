@@ -23,7 +23,10 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
   private pool: pg.Pool;
 
   constructor(connectionString?: string) {
-    const url = connectionString || process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/collab_db';
+    const url =
+      connectionString ||
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:postgres@localhost:5432/collab_db';
     this.pool = new Pool({ connectionString: url });
 
     this.pool.on('error', (err) => {
@@ -79,7 +82,17 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
     await this.pool.query(
       `INSERT INTO document_operations (id, document_id, user_id, user_name, type, position, text, length, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [op.id, op.documentId, op.userId, op.userName, op.type, op.position, op.text || null, op.length || null, op.timestamp]
+      [
+        op.id,
+        op.documentId,
+        op.userId,
+        op.userName,
+        op.type,
+        op.position,
+        op.text || null,
+        op.length || null,
+        op.timestamp,
+      ]
     );
     return op;
   }
@@ -102,7 +115,15 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
     await this.pool.query(
       `INSERT INTO document_snapshots (id, document_id, version, content, saved_by, reason, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [snapshot.id, snapshot.documentId, snapshot.version, snapshot.content, snapshot.savedBy, snapshot.reason, snapshot.createdAt]
+      [
+        snapshot.id,
+        snapshot.documentId,
+        snapshot.version,
+        snapshot.content,
+        snapshot.savedBy,
+        snapshot.reason,
+        snapshot.createdAt,
+      ]
     );
     return snapshot;
   }
@@ -161,7 +182,17 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
          size_bytes = EXCLUDED.size_bytes,
          storage_key = EXCLUDED.storage_key,
          content = EXCLUDED.content`,
-      [file.id, file.documentId, file.path, file.fileType, file.mimeType, file.sizeBytes, file.storageKey, file.content || null, file.createdAt]
+      [
+        file.id,
+        file.documentId,
+        file.path,
+        file.fileType,
+        file.mimeType,
+        file.sizeBytes,
+        file.storageKey,
+        file.content || null,
+        file.createdAt,
+      ]
     );
     return file;
   }

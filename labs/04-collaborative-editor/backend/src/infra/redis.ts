@@ -22,7 +22,9 @@ export async function initRedis(): Promise<boolean> {
     return true;
   } catch (err: unknown) {
     const error = err as Error;
-    console.warn(`[Redis] ⚠️ Não foi possível conectar ao Redis (${error.message}). Continuando sem cluster Pub/Sub.`);
+    console.warn(
+      `[Redis] ⚠️ Não foi possível conectar ao Redis (${error.message}). Continuando sem cluster Pub/Sub.`
+    );
     return false;
   }
 }

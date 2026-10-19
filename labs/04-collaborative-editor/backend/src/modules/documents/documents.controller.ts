@@ -1,20 +1,15 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { DocumentsService } from './documents.service.js';
+import { DocumentsService, defaultDocumentsService } from './documents.service.js';
 
 export class DocumentsController {
-  constructor(
-    private service: DocumentsService = new DocumentsService()
-  ) {}
+  constructor(private service: DocumentsService = defaultDocumentsService) {}
 
   async list(request: FastifyRequest, reply: FastifyReply) {
     const docs = await this.service.listDocuments();
     return reply.status(200).send(docs);
   }
 
-  async getById(
-    request: FastifyRequest<{ Params: { documentId: string } }>,
-    reply: FastifyReply
-  ) {
+  async getById(request: FastifyRequest<{ Params: { documentId: string } }>, reply: FastifyReply) {
     const { documentId } = request.params;
     try {
       const doc = await this.service.getDocument(documentId);
@@ -26,12 +21,42 @@ export class DocumentsController {
   }
 
   async create(
-    request: FastifyRequest<{ Body: { title: string; initialContent?: string } }>,
+    request: FastifyRequest<{
+      Body: { title: string; templateId?: string; initialContent?: string };
+    }>,
     reply: FastifyReply
   ) {
-    const { title, initialContent } = request.body;
-    const doc = await this.service.createDocument(title, initialContent);
+    const { title, templateId, initialContent } = request.body;
+    const doc = await this.service.createDocument(title, templateId, initialContent);
     return reply.status(201).send(doc);
+  }
+
+  async createFromZip(request: FastifyRequest, reply: FastifyReply) {
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: 'Nenhum arquivo ZIP enviado no formulário multipart' });
+    }
+
+    const isZip =
+      data.filename.toLowerCase().endsWith('.zip') ||
+      data.mimetype === 'application/zip' ||
+      data.mimetype === 'application/x-zip-compressed';
+
+    if (!isZip) {
+      return reply.status(400).send({ error: 'O arquivo enviado deve ter a extensão .zip' });
+    }
+
+    const buffer = await data.toBuffer();
+    const fields = data.fields as Record<string, { value?: string } | undefined>;
+    const userTitle = fields.title?.value;
+
+    try {
+      const doc = await this.service.createDocumentFromZip(buffer, userTitle);
+      return reply.status(201).send(doc);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return reply.status(400).send({ error: error.message });
+    }
   }
 
   async getHistory(
@@ -43,10 +68,7 @@ export class DocumentsController {
     return reply.status(200).send(history);
   }
 
-  async flush(
-    request: FastifyRequest<{ Params: { documentId: string } }>,
-    reply: FastifyReply
-  ) {
+  async flush(request: FastifyRequest<{ Params: { documentId: string } }>, reply: FastifyReply) {
     const { documentId } = request.params;
     const snapshot = await this.service.flushCheckpoint(documentId);
     return reply.status(200).send({
@@ -55,10 +77,7 @@ export class DocumentsController {
     });
   }
 
-  async compile(
-    request: FastifyRequest<{ Params: { documentId: string } }>,
-    reply: FastifyReply
-  ) {
+  async compile(request: FastifyRequest<{ Params: { documentId: string } }>, reply: FastifyReply) {
     const { documentId } = request.params;
     try {
       const pdfBuffer = await this.service.compileDocument(documentId);
@@ -145,7 +164,10 @@ export class DocumentsController {
   }
 
   async createFile(
-    request: FastifyRequest<{ Params: { documentId: string }; Body: { path: string; content?: string } }>,
+    request: FastifyRequest<{
+      Params: { documentId: string };
+      Body: { path: string; content?: string };
+    }>,
     reply: FastifyReply
   ) {
     const { documentId } = request.params;
@@ -177,7 +199,10 @@ export class DocumentsController {
   }
 
   async updateFileContent(
-    request: FastifyRequest<{ Params: { documentId: string; fileId: string }; Body: { content: string } }>,
+    request: FastifyRequest<{
+      Params: { documentId: string; fileId: string };
+      Body: { content: string };
+    }>,
     reply: FastifyReply
   ) {
     const { fileId } = request.params;

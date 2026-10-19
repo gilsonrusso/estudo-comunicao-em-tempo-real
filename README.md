@@ -53,10 +53,11 @@ flowchart TD
 - [01. Edição Colaborativa em Tempo Real: OT, CRDT, Persistência e Histórico](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/01-edicao-colaborativa-ot-crdt.md)
 - [02. Cursores Remotos e Atribuição de Autoria em Tempo Real](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/02-cursores-e-presenca-colaborativa.md)
 - [03. Estudo de Caso de Produção: Arquitetura do Overleaf (ShareLaTeX)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/03-estudo-de-caso-overleaf.md)
+- [04. Arquitetura Detalhada: Editor Colaborativo de Artigos Científicos (Overleaf Clone)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/docs/03-casos-reais-e-padroes/04-arquitetura-overleaf-clone.md)
 - [Lab 01: Server-Sent Events (SSE)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/01-sse-streaming/README.md)
 - [Lab 02: WebSocket Chat com Salas e Presença](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/02-websocket-chat/README.md)
 - [Lab 03: Escala Horizontal Multi-Nó com Redis e Docker](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/03-scale-redis-pubsub/README.md)
-- [Lab 04: Editor Colaborativo em LaTeX estilo Overleaf (CodeMirror 6 + TeX Live + Fastify + PostgreSQL + Redis)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/04-collaborative-editor/README.md)
+- [Lab 04: Editor Colaborativo em LaTeX estilo Overleaf (CodeMirror 6 + TeX Live + Fastify + PostgreSQL + Redis + MinIO + LanguageTool)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/labs/04-collaborative-editor/README.md)
 
 ### Módulo 4: Kubernetes, Kind & GitOps com Argo
 - [Guia Operacional: Subindo a Arquitetura no Kubernetes & Argo CD (k8s/README.md)](file:///mnt/c0b6217c-c2f3-4c1f-8ba2-c8d177f718a9/development/professional/estudo-comunicao-em-tempo-real/k8s/README.md)

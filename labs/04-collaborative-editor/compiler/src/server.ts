@@ -93,27 +93,20 @@ fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) =>
 
     request.log.info({ jobId, documentId, mainEntry: safeMainEntry, filesCount: files?.length || 1 }, 'Iniciando compilação LaTeX em sandbox');
 
-    // 3. Executa pdflatex com proteções de segurança
-    // -no-shell-escape: Bloqueia comandos do terminal (\write18)
-    // -interaction=nonstopmode: Não pausa solicitando entrada interativa no terminal
-    const compileResult = await new Promise<{ exitCode: number; stdout: string; stderr: string }>(
-      (resolve) => {
+    // Helper para execução segura de processos no sandbox
+    const runProcess = (
+      cmd: string,
+      args: string[],
+      timeoutMs = 25000
+    ): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
+      return new Promise((resolve) => {
         let stdout = '';
         let stderr = '';
 
-        const child = spawn(
-          'pdflatex',
-          [
-            '-interaction=nonstopmode',
-            '-no-shell-escape',
-            `-output-directory=${sandboxDir}`,
-            entryFullPath,
-          ],
-          {
-            timeout: 25000, // Timeout rígido de 25 segundos
-            cwd: sandboxDir,
-          }
-        );
+        const child = spawn(cmd, args, {
+          timeout: timeoutMs,
+          cwd: sandboxDir,
+        });
 
         child.stdout.on('data', (chunk) => {
           stdout += chunk.toString();
@@ -128,11 +121,44 @@ fastify.post<{ Body: CompileRequestBody }>('/compile', async (request, reply) =>
         });
 
         child.on('error', (err) => {
-          stderr += `\nErro ao disparar processo: ${err.message}`;
+          stderr += `\nErro ao disparar processo ${cmd}: ${err.message}`;
           resolve({ exitCode: 1, stdout, stderr });
         });
+      });
+    };
+
+    // 3. Executa pdflatex com proteções de segurança (-no-shell-escape)
+    // Passe 1: Gera .aux inicial e primeira saída
+    const pdflatexArgs = [
+      '-interaction=nonstopmode',
+      '-no-shell-escape',
+      `-output-directory=${sandboxDir}`,
+      entryFullPath,
+    ];
+
+    let compileResult = await runProcess('pdflatex', pdflatexArgs);
+
+    // Se gerou .aux, verifica se há citações bibliográficas que requerem bibtex
+    const auxPath = path.join(sandboxDir, `${entryBaseName}.aux`);
+    let requiresBibtex = false;
+    try {
+      const auxContent = await fs.readFile(auxPath, 'utf-8');
+      if (auxContent.includes('\\bibdata') || auxContent.includes('\\citation')) {
+        requiresBibtex = true;
       }
-    );
+    } catch {
+      // Ignora erro ao ler .aux
+    }
+
+    if (requiresBibtex) {
+      request.log.info({ jobId, entryBaseName }, 'Executando bibtex para resolver citações bibliográficas');
+      await runProcess('bibtex', [entryBaseName], 15000);
+      // Passe 2 pós-bibtex para incorporar as referências
+      await runProcess('pdflatex', pdflatexArgs);
+    }
+
+    // Passe final de consolidação de referências cruzadas (\ref, \label, sumário)
+    compileResult = await runProcess('pdflatex', pdflatexArgs);
 
     const pdfPath = path.join(sandboxDir, `${entryBaseName}.pdf`);
     const logPath = path.join(sandboxDir, `${entryBaseName}.log`);

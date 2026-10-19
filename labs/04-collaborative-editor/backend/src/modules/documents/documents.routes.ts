@@ -47,6 +47,22 @@ export const documentsRoutes: FastifyPluginAsyncZod = async (fastify) => {
     controller.create.bind(controller)
   );
 
+  // Criar documento a partir de upload de arquivo ZIP (estilo Overleaf)
+  fastify.post(
+    '/api/documents/upload-zip',
+    {
+      schema: {
+        tags: ['Documents'],
+        summary: 'Criar novo artigo a partir do upload de pacote .zip (estilo Overleaf)',
+        response: {
+          201: DocumentSchema,
+          400: z.object({ error: z.string() }),
+        },
+      },
+    },
+    controller.createFromZip.bind(controller)
+  );
+
   // Obter documento por ID
   fastify.get(
     '/api/documents/:documentId',

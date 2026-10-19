@@ -59,7 +59,8 @@ export const UpdateDocumentTitleBodySchema = z.object({
 
 export const CreateDocumentBodySchema = z.object({
   title: z.string().min(1),
-  initialContent: z.string().default(''),
+  templateId: z.string().optional(),
+  initialContent: z.string().optional(),
 });
 
 export const ProjectFileSchema = z.object({
@@ -89,3 +90,32 @@ export const CreateFileBodySchema = z.object({
   path: z.string().min(1),
   content: z.string().default(''),
 });
+
+export const CommentReplySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  userColor: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+});
+
+export type CommentReply = z.infer<typeof CommentReplySchema>;
+
+export const ReviewCommentSchema = z.object({
+  id: z.string(),
+  documentId: z.string(),
+  file: z.string(),
+  from: z.number().int().nonnegative(),
+  to: z.number().int().nonnegative(),
+  selectedText: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  userColor: z.string(),
+  content: z.string(),
+  status: z.enum(['open', 'resolved']),
+  createdAt: z.string(),
+  replies: z.array(CommentReplySchema).default([]),
+});
+
+export type ReviewComment = z.infer<typeof ReviewCommentSchema>;

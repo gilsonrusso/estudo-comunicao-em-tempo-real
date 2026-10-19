@@ -5,18 +5,19 @@ import {
   DocumentOperation,
   DocumentSnapshot,
   ProjectFile,
+  ReviewComment,
+  CommentReply,
 } from './documents.schema.js';
-import {
-  IDocumentsRepository,
-  PostgresDocumentsRepository,
-} from './documents.repository.js';
+import { IDocumentsRepository, PostgresDocumentsRepository } from './documents.repository.js';
 import { redisPubClient } from '../../infra/redis.js';
 import {
-  uploadToS3,
-  getFromS3,
-  deleteFromS3,
-  getInternalS3Url,
-} from '../../infra/s3.js';
+  uploadToMinio,
+  getFromMinio,
+  deleteFromMinio,
+  getInternalMinioUrl,
+} from '../../infra/minio.js';
+import { defaultTemplatesService } from '../templates/templates.service.js';
+import { parseLatexZip } from '../../utils/latex-zip-parser.js';
 
 // Repositório conectado ao PostgreSQL
 export const defaultDocumentsRepository = new PostgresDocumentsRepository();
@@ -24,6 +25,7 @@ export const defaultDocumentsRepository = new PostgresDocumentsRepository();
 interface ActiveDocState {
   content: string;
   version: number;
+  opSeq: number;
   pendingOps: number;
   debounceTimer: NodeJS.Timeout | null;
   lastAuthor: string;
@@ -32,10 +34,56 @@ interface ActiveDocState {
 
 export class DocumentsService {
   private activeDocs: Map<string, ActiveDocState> = new Map();
+  private commentsMap: Map<string, ReviewComment[]> = new Map();
 
-  constructor(
-    private repository: IDocumentsRepository = defaultDocumentsRepository
-  ) {}
+  constructor(private repository: IDocumentsRepository = defaultDocumentsRepository) {
+    // Seed de comentários de revisão para o documento padrão 'doc-1'
+    this.commentsMap.set('doc-1', [
+      {
+        id: 'comm-1',
+        documentId: 'doc-1',
+        file: 'main.tex',
+        from: 350,
+        to: 450,
+        selectedText:
+          'sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas',
+        userId: 'reviewer-1',
+        userName: 'Prof. Carlos',
+        userColor: '#9333ea',
+        content:
+          'Excelente contextualização. Poderíamos adicionar uma menção explícita ao algoritmo de State Machine Replication e consistência eventual?',
+        status: 'open',
+        createdAt: new Date(Date.now() - 3600000 * 2).toLocaleTimeString(),
+        replies: [
+          {
+            id: 'rep-1',
+            userId: 'author-alice',
+            userName: 'Alice Silva',
+            userColor: '#059669',
+            content:
+              'Concordo professor! Já preparei a citação da bibliografia para incluir na Seção 2.',
+            createdAt: new Date(Date.now() - 3600000 * 1).toLocaleTimeString(),
+          },
+        ],
+      },
+      {
+        id: 'comm-2',
+        documentId: 'doc-1',
+        file: 'main.tex',
+        from: 1050,
+        to: 1100,
+        selectedText: 'architecture.png',
+        userId: 'reviewer-2',
+        userName: 'Revisor Anônimo 2',
+        userColor: '#ea580c',
+        content:
+          'Verificar se o arquivo PNG no bucket MinIO possui resolução mínima de 300 DPI conforme as diretrizes da conferência IEEE/ACM.',
+        status: 'open',
+        createdAt: new Date(Date.now() - 1800000).toLocaleTimeString(),
+        replies: [],
+      },
+    ]);
+  }
 
   async getDocument(id: string): Promise<Document> {
     const doc = await this.repository.findById(id);
@@ -57,6 +105,7 @@ export class DocumentsService {
     this.activeDocs.set(id, {
       content: doc.content,
       version: doc.version,
+      opSeq: 0,
       pendingOps: 0,
       debounceTimer: null,
       lastAuthor: 'Sistema',
@@ -69,17 +118,112 @@ export class DocumentsService {
     return this.repository.findAll();
   }
 
-  async createDocument(title: string, initialContent = ''): Promise<Document> {
+  async createDocument(
+    title: string,
+    templateId?: string,
+    initialContent?: string
+  ): Promise<Document> {
     const id = randomUUID();
+    let finalContent = initialContent ?? '';
+
+    // Se um template for especificado, busca os arquivos correspondentes
+    const template = templateId ? await defaultTemplatesService.getTemplateById(templateId) : null;
+    if (template) {
+      const mainFile = template.files.find((f) => f.isMain || f.path === 'main.tex');
+      if (mainFile && !initialContent) {
+        finalContent = mainFile.content || '';
+      }
+    }
+
     const doc: Document = {
       id,
       title,
-      content: initialContent,
+      content: finalContent,
       version: 1,
       updatedAt: new Date().toISOString(),
     };
 
     await this.repository.create(doc);
+
+    // Registra a Versão 1 inicial no histórico de snapshots
+    await this.repository.createSnapshot({
+      id: randomUUID(),
+      documentId: id,
+      version: 1,
+      content: finalContent,
+      savedBy: 'Sistema',
+      reason: 'versao_inicial',
+      createdAt: doc.updatedAt,
+    });
+
+    // Se o template possuir arquivos adicionais (.cls, .bib, imagens), associa-os ao novo projeto
+    if (template) {
+      for (const file of template.files) {
+        if (file.isMain || file.path === 'main.tex') continue;
+        if (file.content !== undefined && file.content !== null) {
+          try {
+            await this.createProjectTextFile(id, file.path, file.content);
+          } catch (fileErr) {
+            console.warn(
+              `[Template Init] Erro ao criar arquivo ${file.path} para o documento ${id}:`,
+              fileErr
+            );
+          }
+        } else if (file.storageKey) {
+          try {
+            const { buffer, contentType } = await getFromMinio(file.storageKey);
+            await this.uploadProjectFile(id, file.path, buffer, contentType);
+          } catch (fileErr) {
+            console.warn(
+              `[Template Init] Erro ao clonar ativo binário ${file.path} para o documento ${id}:`,
+              fileErr
+            );
+          }
+        }
+      }
+    }
+
+    return doc;
+  }
+
+  /**
+   * Cria um novo artigo a partir da descompactação de um arquivo ZIP (estilo Overleaf)
+   */
+  async createDocumentFromZip(zipBuffer: Buffer, userTitle?: string): Promise<Document> {
+    const parsed = parseLatexZip(zipBuffer);
+    const id = randomUUID();
+    const finalTitle = userTitle?.trim() || parsed.detectedTitle || 'Artigo Importado via ZIP';
+
+    const doc: Document = {
+      id,
+      title: finalTitle,
+      content: parsed.rootDoc.content,
+      version: 1,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.repository.create(doc);
+
+    // Registra a Versão 1 inicial no histórico de snapshots
+    await this.repository.createSnapshot({
+      id: randomUUID(),
+      documentId: id,
+      version: 1,
+      content: parsed.rootDoc.content,
+      savedBy: 'Sistema',
+      reason: 'versao_inicial',
+      createdAt: doc.updatedAt,
+    });
+
+    // Persiste os arquivos auxiliares (estilos .cls/.sty, bibliografia .bib, imagens e assets)
+    for (const file of parsed.files) {
+      if (!file.isBinary && file.content !== undefined) {
+        await this.createProjectTextFile(id, file.path, file.content);
+      } else if (file.isBinary && file.buffer) {
+        await this.uploadProjectFile(id, file.path, file.buffer, file.mimeType);
+      }
+    }
+
     return doc;
   }
 
@@ -119,9 +263,12 @@ export class DocumentsService {
       active.content = active.content.slice(0, pos) + active.content.slice(pos + delta.length);
     }
 
-    active.version++;
+    active.opSeq++;
     active.pendingOps++;
     active.lastAuthor = delta.userName;
+
+    // Ajusta as posições dos comentários inline com base no delta aplicado
+    this.adjustCommentPositions(documentId, 'main.tex', delta);
 
     // 2. Registra a operação no PostgreSQL (append-only) e no buffer do Redis
     const op: DocumentOperation = {
@@ -165,7 +312,12 @@ export class DocumentsService {
     const active = this.activeDocs.get(documentId);
     if (!active || active.pendingOps === 0) return null;
 
-    console.log(`[PostgreSQL] 💾 Persistindo Checkpoint Snapshot do documento ${documentId} (Versão ${active.version})...`);
+    // Incrementa a versão semântica de revisão do histórico
+    active.version++;
+
+    console.log(
+      `[PostgreSQL] 💾 Persistindo Checkpoint Snapshot do documento ${documentId} (Versão ${active.version})...`
+    );
 
     // Atualiza o documento no banco relacional PostgreSQL
     await this.repository.updateContent(documentId, active.content, active.version);
@@ -231,8 +383,8 @@ export class DocumentsService {
     const fileId = randomUUID();
     const storageKey = `${documentId}/${fileId}-${cleanPath.split('/').pop()}`;
 
-    // 1. Salva o blob no MinIO S3
-    await uploadToS3(storageKey, buffer, mimeType);
+    // 1. Salva o blob no bucket MinIO
+    await uploadToMinio(storageKey, buffer, mimeType);
 
     // 2. Persiste metadados na tabela project_files
     const projectFile: ProjectFile = {
@@ -252,13 +404,15 @@ export class DocumentsService {
   /**
    * Obtém o conteúdo binário de um arquivo armazenado no MinIO
    */
-  async getProjectFileRaw(fileId: string): Promise<{ buffer: Buffer; mimeType: string; path: string }> {
+  async getProjectFileRaw(
+    fileId: string
+  ): Promise<{ buffer: Buffer; mimeType: string; path: string }> {
     const file = await this.repository.findProjectFileById(fileId);
     if (!file || !file.storageKey) {
       throw new Error(`Arquivo ${fileId} não encontrado`);
     }
 
-    const { buffer, contentType } = await getFromS3(file.storageKey);
+    const { buffer, contentType } = await getFromMinio(file.storageKey);
     return {
       buffer,
       mimeType: file.mimeType || contentType,
@@ -292,7 +446,8 @@ export class DocumentsService {
       documentId,
       path: cleanPath,
       fileType,
-      mimeType: fileType === 'tex' ? 'text/x-tex' : fileType === 'bib' ? 'text/plain' : 'text/plain',
+      mimeType:
+        fileType === 'tex' ? 'text/x-tex' : fileType === 'bib' ? 'text/plain' : 'text/plain',
       sizeBytes: Buffer.byteLength(content, 'utf-8'),
       storageKey: null,
       content,
@@ -318,9 +473,9 @@ export class DocumentsService {
 
     if (file.storageKey) {
       try {
-        await deleteFromS3(file.storageKey);
+        await deleteFromMinio(file.storageKey);
       } catch (err) {
-        console.warn(`[MinIO S3] Falha ao deletar objeto ${file.storageKey}:`, err);
+        console.warn(`[MinIO] Falha ao deletar objeto ${file.storageKey}:`, err);
       }
     }
 
@@ -364,7 +519,7 @@ export class DocumentsService {
         filesPayload.push({
           path: file.path,
           type: 'binary_url',
-          url: getInternalS3Url(file.storageKey),
+          url: getInternalMinioUrl(file.storageKey),
         });
       }
     }
@@ -386,10 +541,99 @@ export class DocumentsService {
         error?: string;
         details?: string;
       };
-      throw new Error(errorJson.details || errorJson.error || `Erro de compilação (${response.status})`);
+      throw new Error(
+        errorJson.details || errorJson.error || `Erro de compilação (${response.status})`
+      );
     }
 
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
+
+  /**
+   * Obtém a lista de comentários de revisão do documento
+   */
+  getComments(documentId: string): ReviewComment[] {
+    return this.commentsMap.get(documentId) || [];
+  }
+
+  /**
+   * Cria um novo comentário de revisão sobre um trecho selecionado
+   */
+  addComment(documentId: string, comment: ReviewComment): ReviewComment {
+    const list = this.commentsMap.get(documentId) || [];
+    list.unshift(comment);
+    this.commentsMap.set(documentId, list);
+    return comment;
+  }
+
+  /**
+   * Adiciona uma resposta a uma thread de comentário existente
+   */
+  replyComment(documentId: string, commentId: string, reply: CommentReply): ReviewComment | null {
+    const list = this.commentsMap.get(documentId) || [];
+    const comm = list.find((c) => c.id === commentId);
+    if (!comm) return null;
+    comm.replies.push(reply);
+    return comm;
+  }
+
+  /**
+   * Altera o status do comentário (open vs resolved)
+   */
+  resolveComment(
+    documentId: string,
+    commentId: string,
+    status: 'open' | 'resolved'
+  ): ReviewComment | null {
+    const list = this.commentsMap.get(documentId) || [];
+    const comm = list.find((c) => c.id === commentId);
+    if (!comm) return null;
+    comm.status = status;
+    return comm;
+  }
+
+  /**
+   * Remove um comentário
+   */
+  deleteComment(documentId: string, commentId: string): boolean {
+    const list = this.commentsMap.get(documentId) || [];
+    const filtered = list.filter((c) => c.id !== commentId);
+    this.commentsMap.set(documentId, filtered);
+    return filtered.length !== list.length;
+  }
+
+  /**
+   * Ajusta os índices de início (from) e fim (to) dos comentários quando um delta é aplicado
+   */
+  adjustCommentPositions(documentId: string, file: string, delta: DeltaOperation): void {
+    const list = this.commentsMap.get(documentId);
+    if (!list) return;
+
+    for (const comment of list) {
+      if (comment.file !== file) continue;
+
+      if (delta.type === 'insert' && delta.text) {
+        const len = delta.text.length;
+        if (delta.position <= comment.from) {
+          comment.from += len;
+          comment.to += len;
+        } else if (delta.position > comment.from && delta.position < comment.to) {
+          comment.to += len;
+        }
+      } else if (delta.type === 'delete' && delta.length) {
+        const len = delta.length;
+        if (delta.position + len <= comment.from) {
+          comment.from -= len;
+          comment.to -= len;
+        } else if (delta.position < comment.to && delta.position + len > comment.from) {
+          comment.from = Math.min(comment.from, delta.position);
+          comment.to = Math.max(comment.from, comment.to - len);
+        }
+      }
+    }
+  }
 }
+
+export const defaultDocumentsService = new DocumentsService();
+

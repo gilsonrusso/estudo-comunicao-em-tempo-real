@@ -1,0 +1,34 @@
+[
+  {
+    "id": "sbc",
+    "name": "SBC - Sociedade Brasileira de Computação",
+    "description": "Template oficial para artigos de conferências da SBC com sbc-template.sty, bibliografia e figuras de exemplo.",
+    "category": "brazilian-conferences",
+    "filesCount": 5,
+    "hasCls": true
+  },
+  {
+    "id": "ieee",
+    "name": "IEEE Conference Template (IEEEtran)",
+    "description": "Template oficial da IEEE para artigos em formato duas colunas com classe IEEEtran.cls oficial.",
+    "category": "international-conferences",
+    "filesCount": 3,
+    "hasCls": true
+  },
+  {
+    "id": "acm",
+    "name": "ACM Conference Proceedings (acmart)",
+    "description": "Template oficial da Association for Computing Machinery com classe acmart.cls e formato sigconf.",
+    "category": "international-conferences",
+    "filesCount": 6,
+    "hasCls": true
+  },
+  {
+    "id": "blank",
+    "name": "Artigo em Branco (Standard LaTeX)",
+    "description": "Documento LaTeX padrão limpo utilizando a classe oficial article para início imediato.",
+    "category": "general",
+    "filesCount": 1,
+    "hasCls": false
+  }
+]

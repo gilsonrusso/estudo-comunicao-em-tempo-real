@@ -1,16 +1,16 @@
-import type { PaletteOptions } from "@mui/material/styles";
-import { alpha } from "@mui/material/styles";
-import { colors, getSciLatexTokens, type ThemePreset } from "./tokens";
+import type { PaletteOptions } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
+import { colors, getSciLatexTokens, type ThemePreset } from './tokens';
 
 export const getPalette = (
-  mode: "light" | "dark",
-  preset: ThemePreset = "overleaf",
+  mode: 'light' | 'dark',
+  preset: ThemePreset = 'overleaf'
 ): PaletteOptions => {
   const tokens = getSciLatexTokens(mode, preset);
 
-  if (mode === "dark") {
+  if (mode === 'dark') {
     return {
-      mode: "dark",
+      mode: 'dark',
       primary: {
         main: tokens.primary.main,
         light: tokens.primary.hover,
@@ -68,7 +68,7 @@ export const getPalette = (
 
   // Light Mode
   return {
-    mode: "light",
+    mode: 'light',
     primary: {
       main: tokens.primary.main,
       light: tokens.primary.hover,
@@ -124,5 +124,5 @@ export const getPalette = (
   };
 };
 
-export const darkPalette = getPalette("dark", "blue");
-export const lightPalette = getPalette("light", "blue");
+export const darkPalette = getPalette('dark', 'blue');
+export const lightPalette = getPalette('light', 'blue');

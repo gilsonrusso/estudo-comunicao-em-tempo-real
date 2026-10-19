@@ -7,6 +7,7 @@ resources:
   - redis.yaml
   - minio.yaml
   - compiler.yaml
+  - languagetool.yaml
   - backend.yaml
   - frontend.yaml
   - ingress.yaml

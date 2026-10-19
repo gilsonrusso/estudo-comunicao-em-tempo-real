@@ -68,7 +68,7 @@ data:
     \maketitle
 
     \begin{abstract}
-    Este artigo investiga os mecanismos de sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas (Redis + PostgreSQL). Demonstramos o desacoplamento de alta frequência via WebSockets e a compilação isolada de documentos LaTeX em um micro-serviço TeX Live dedicado com suporte a imagens no MinIO S3.
+    Este artigo investiga os mecanismos de sincronização colaborativa em tempo real com Transformação Operacional (OT) e persistência de duas camadas (Redis + PostgreSQL). Demonstramos o desacoplamento de alta frequência via WebSockets e a compilação isolada de documentos LaTeX em um micro-serviço TeX Live dedicado com suporte a imagens no bucket MinIO.
     \end{abstract}
 
     \section{Introdução}
@@ -81,12 +81,12 @@ data:
     \end{equation}
 
     \section{Arquitetura e Suporte a Múltiplos Ativos}
-    A separação do compilador em um pool elástico de contêineres permite que ativos binários (figuras, fontes, pacotes de estilo) sejam armazenados em Object Storage (MinIO/S3) e injetados de forma sob demanda no sandbox de compilação:
+    A separação do compilador em um pool elástico de contêineres permite que ativos binários (figuras, fontes, pacotes de estilo) sejam armazenados em Object Storage (MinIO) e injetados de forma sob demanda no sandbox de compilação:
 
     \begin{figure}[htbp]
       \centering
       \includegraphics[width=0.75\linewidth]{architecture.png}
-      \caption{Topologia de microsserviços com MinIO S3 e compilador isolado em sandbox efêmero.}
+      \caption{Topologia de microsserviços com bucket MinIO e compilador isolado em sandbox efêmero.}
       \label{fig:architecture}
     \end{figure}
 
