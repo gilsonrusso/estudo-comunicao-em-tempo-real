@@ -81,6 +81,66 @@ export const documentsWebSocketPlugin: FastifyPluginAsync = async (fastify) => {
         const message = JSON.parse(raw.toString());
 
         switch (message.type) {
+          // Cliente enviou atualizações com @codemirror/collab
+          case 'PUSH_UPDATES': {
+            const targetFile = message.file || 'main.tex';
+            const clientVersion = typeof message.version === 'number' ? message.version : 0;
+            const updates = Array.isArray(message.updates) ? message.updates : [];
+
+            if (updates.length === 0) {
+              break;
+            }
+
+            console.log(
+              `[WS PUSH_UPDATES] from ${userName} (${userId}) file=${targetFile} ver=${clientVersion} count=${updates.length}`
+            );
+
+            const result = await service.pushUpdates(
+              documentId,
+              targetFile,
+              clientVersion,
+              updates,
+              userId,
+              userName,
+              (snapshot: DocumentSnapshot) => {
+                broadcastToRoom(documentId, {
+                  type: 'SNAPSHOT_SAVED',
+                  snapshot,
+                  version: snapshot.version,
+                  time: new Date().toLocaleTimeString(),
+                });
+              }
+            );
+
+            if (result.rebasedUpdates.length > 0) {
+              // Transmite as atualizações rebaseadas para todos os clientes da sala
+              broadcastToRoom(documentId, {
+                type: 'PULL_UPDATES_RESPONSE',
+                file: targetFile,
+                version: result.newVersion,
+                updates: result.rebasedUpdates,
+                author: { userId, userName, color },
+                status: 'pending_debounce',
+              });
+            }
+            break;
+          }
+
+          case 'PULL_UPDATES': {
+            const targetFile = message.file || 'main.tex';
+            const clientVersion = typeof message.version === 'number' ? message.version : 0;
+            const historyUpdates = service.getUpdatesSince(documentId, targetFile, clientVersion);
+            socket.send(
+              JSON.stringify({
+                type: 'PULL_UPDATES_RESPONSE',
+                file: targetFile,
+                version: service.getCollabVersion(documentId, targetFile),
+                updates: historyUpdates,
+              })
+            );
+            break;
+          }
+
           // Cliente enviou um delta de texto atômico (insert ou delete)
           case 'APPLY_DELTA': {
             const targetFile = message.file || (message.delta && message.delta.file) || 'main.tex';
@@ -281,6 +341,7 @@ export const documentsWebSocketPlugin: FastifyPluginAsync = async (fastify) => {
         JSON.stringify({
           type: 'SYNC_INIT',
           document: doc,
+          version: service.getCollabVersion(documentId, 'main.tex'),
           comments,
           collaborators: getDocumentClients(documentId).map((c) => ({
             userId: c.userId,

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import {
   Collaborator,
+  CollabUpdateJSON,
   DeltaOperation,
   DocumentData,
   DocumentSnapshot,
@@ -25,6 +26,7 @@ import { useLatexCompiler } from '../hooks/useLatexCompiler';
 import { useDocumentHistoryQuery } from '../hooks/useDocumentHistoryQuery';
 import { useFlushDocumentMutation } from '../hooks/useFlushDocumentMutation';
 import { EditorService } from '../services/editor.service';
+import { HistoryStatus } from '../extensions/history/historyExtension.js';
 
 export interface CollabEditorContextValue {
   documentId: string;
@@ -40,6 +42,7 @@ export interface CollabEditorContextValue {
   secondarySaveStatus: Record<string, SaveStatus>;
   lastSavedAt: string | null;
   isConnected: boolean;
+  isSynced: boolean;
   isFlushing: boolean;
   snapshots: DocumentSnapshot[];
   operations: DeltaOperation[];
@@ -58,12 +61,27 @@ export interface CollabEditorContextValue {
   comments: ReviewComment[];
   activeCommentId: string | null;
   setActiveCommentId: (id: string | null) => void;
+  historyStatus: HistoryStatus;
+  setHistoryStatus: (status: HistoryStatus) => void;
+  handleUndo: () => void;
+  handleRedo: () => void;
+  registerEditorActions: (actions: { undo: () => boolean; redo: () => boolean } | null) => void;
   // Compiler
   pdfBlobUrl: string | null;
   isCompiling: boolean;
   compileError: string | null;
   lastCompiledAt: string | null;
   recompile: () => Promise<void>;
+  // CodeMirror Collab Integration
+  collabVersion: number;
+  incomingCollabUpdates: {
+    file: string;
+    version: number;
+    updates: CollabUpdateJSON[];
+    timestamp: number;
+  } | null;
+  handlePushCollabUpdates: (file: string, version: number, updates: CollabUpdateJSON[]) => void;
+  handleDocContentChange: (content: string) => void;
   // Handlers
   handleApplyLocalDelta: (delta: Omit<DeltaOperation, 'userId' | 'userName' | 'timestamp'>) => void;
   handleSecondaryDelta: (delta: {
@@ -128,6 +146,30 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('synced');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
+  const [historyStatus, setHistoryStatus] = useState<HistoryStatus>({
+    canUndo: false,
+    canRedo: false,
+    undoDepth: 0,
+    redoDepth: 0,
+    canUndoSelection: false,
+    canRedoSelection: false,
+  });
+  const editorActionsRef = useRef<{ undo: () => boolean; redo: () => boolean } | null>(null);
+
+  const handleUndo = useCallback(() => {
+    editorActionsRef.current?.undo();
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    editorActionsRef.current?.redo();
+  }, []);
+
+  const registerEditorActions = useCallback(
+    (actions: { undo: () => boolean; redo: () => boolean } | null) => {
+      editorActionsRef.current = actions;
+    },
+    []
+  );
   // Queries e Mutations do TanStack Query
   const { data: historyData } = useDocumentHistoryQuery(documentId);
   const flushMutation = useFlushDocumentMutation(documentId);
@@ -142,6 +184,14 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
   const fileContentsRef = useRef<Record<string, string>>({});
   const [secondarySaveStatus, setSecondarySaveStatus] = useState<Record<string, SaveStatus>>({});
   const fileSaveDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [collabVersion, setCollabVersion] = useState<number>(0);
+  const [isSynced, setIsSynced] = useState<boolean>(false);
+  const [incomingCollabUpdates, setIncomingCollabUpdates] = useState<{
+    file: string;
+    version: number;
+    updates: CollabUpdateJSON[];
+    timestamp: number;
+  } | null>(null);
 
   // Layout e Painéis
   const [layoutMode, setLayoutMode] = useState<'split' | 'editor' | 'pdf'>('split');
@@ -220,9 +270,31 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
   );
 
   const handleSyncInit = useCallback(
-    (doc: DocumentData, _collabs: Collaborator[], initialComments?: ReviewComment[]) => {
+    (
+      doc: DocumentData,
+      _collabs: Collaborator[],
+      initialComments?: ReviewComment[],
+      initCollabVersion?: number
+    ) => {
       setDocumentData(doc);
       if (initialComments) setComments(initialComments);
+      const ver = typeof initCollabVersion === 'number' ? initCollabVersion : doc.version;
+      setCollabVersion(ver);
+      setIsSynced(true);
+    },
+    []
+  );
+
+  const handleRemoteCollabUpdates = useCallback(
+    (targetFile: string, version: number, updates: CollabUpdateJSON[]) => {
+      setIncomingCollabUpdates({
+        file: targetFile,
+        version,
+        updates,
+        timestamp: Date.now(),
+      });
+      setCollabVersion(version);
+      setSaveStatus('pending_debounce');
     },
     []
   );
@@ -255,6 +327,7 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
     remoteCursors,
     activeEditor,
     sendDelta,
+    sendCollabUpdates,
     sendCursorMove,
     sendRawMessage,
   } = useCollabWebSocket({
@@ -263,6 +336,7 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
     userName,
     activeFile,
     onRemoteDelta: handleRemoteDelta,
+    onRemoteCollabUpdates: handleRemoteCollabUpdates,
     onSyncInit: handleSyncInit,
     onSnapshotSaved: handleSnapshotSaved,
     onCommentAdded: handleCommentAdded,
@@ -359,6 +433,26 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
     },
     [activeFile, fileContents, openTabs, documentId, sendDelta]
   );
+  const handlePushCollabUpdates = useCallback(
+    (file: string, version: number, updates: CollabUpdateJSON[]) => {
+      sendCollabUpdates(file, version, updates);
+      setSaveStatus('pending_debounce');
+    },
+    [sendCollabUpdates]
+  );
+
+  const handleDocContentChange = useCallback(
+    (newContent: string) => {
+      if (activeFile === 'main.tex') {
+        setDocumentData((prev) => (prev ? { ...prev, content: newContent } : prev));
+      } else {
+        fileContentsRef.current[activeFile] = newContent;
+        setFileContents((prev) => ({ ...prev, [activeFile]: newContent }));
+      }
+    },
+    [activeFile]
+  );
+
 
   const handleCursorMove = useCallback(
     (position: number, selectionStart?: number, selectionEnd?: number) => {
@@ -537,6 +631,11 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
     compileError,
     lastCompiledAt,
     recompile,
+    isSynced,
+    collabVersion,
+    incomingCollabUpdates,
+    handlePushCollabUpdates,
+    handleDocContentChange,
     handleApplyLocalDelta,
     handleSecondaryDelta,
     handleCursorMove,
@@ -548,6 +647,11 @@ export function CollabEditorProvider({ documentId, children }: CollabEditorProvi
     handleReplyComment,
     handleResolveComment,
     handleDeleteComment,
+    historyStatus,
+    setHistoryStatus,
+    handleUndo,
+    handleRedo,
+    registerEditorActions,
   };
 
   return <CollabEditorContext.Provider value={value}>{children}</CollabEditorContext.Provider>;

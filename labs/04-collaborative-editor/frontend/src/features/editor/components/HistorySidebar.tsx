@@ -1,5 +1,5 @@
 import { DeltaOperation, DocumentSnapshot } from '../types/collab.types';
-import { History, HardDriveDownload, Clock, CheckCircle2 } from 'lucide-react';
+import { History, HardDriveDownload, Clock, CheckCircle2, GitCompare } from 'lucide-react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -13,6 +13,7 @@ export interface HistorySidebarProps {
   snapshots: DocumentSnapshot[];
   onManualFlush: () => void;
   isFlushing: boolean;
+  onCompareSnapshot?: (snapshot: DocumentSnapshot) => void;
 }
 
 function formatReason(reason: string): string {
@@ -45,6 +46,7 @@ export function HistorySidebar({
   snapshots,
   onManualFlush,
   isFlushing,
+  onCompareSnapshot,
 }: HistorySidebarProps) {
   return (
     <Box
@@ -208,6 +210,22 @@ export function HistorySidebar({
                     {formatReason(s.reason)}
                   </Typography>
                 </Stack>
+                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', gap: 0.8 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<GitCompare size={12} />}
+                    onClick={() => onCompareSnapshot?.(s)}
+                    sx={{
+                      fontSize: '0.7rem',
+                      height: 24,
+                      px: 0.9,
+                      textTransform: 'none',
+                    }}
+                  >
+                    Comparar com Atual
+                  </Button>
+                </Box>
               </Paper>
             );
           })

@@ -10,14 +10,14 @@ A arquitetura do Overleaf é uma das implementações industriais mais consagrad
 
 | Dimensão | Overleaf (ShareLaTeX) | Nosso Lab 04 |
 | :--- | :--- | :--- |
-| **Algoritmo de Colaboração** | **OT (Operational Transformation)** via **ShareDB** (`ot-text`) | **Sequenciador Centralizado de Deltas** (base de OT) |
-| **Componente de Editor (UI)** | **CodeMirror 6** (historicamente Ace Editor / CM5) | **Textarea Nativo + Padrão Underlay Backdrop** |
-| **Cursores e Presença** | CodeMirror *Decorations* (`Decoration.widget`) | Divs absolutos com medição de caracteres em espelho |
-| **Realce de Autoria ("Quem editou o quê")** | CodeMirror *Mark Decorations* (`Decoration.mark`) | Tags `<mark>` na camada de backdrop sincronizada |
+| **Algoritmo de Colaboração** | **OT (Operational Transformation)** via **ShareDB** (`ot-text`) | **OT Nativa via `@codemirror/collab`** com `rebaseUpdates` e `ChangeSet` |
+| **Componente de Editor (UI)** | **CodeMirror 6** (historicamente Ace Editor / CM5) | **CodeMirror 6 Virtualizado** (com TeX Live + LanguageTool) |
+| **Cursores e Presença** | CodeMirror *Decorations* (`Decoration.widget`) | CodeMirror *Decorations* (`Decoration.widget` + `mark` + `line`) |
+| **Realce de Autoria ("Quem editou o quê")** | CodeMirror *Mark Decorations* (`Decoration.mark`) | CodeMirror *Mark Decorations* (`cm-collaborator-selection`) |
 | **Coordenação em Tempo Real** | WebSockets + **Redis Pub/Sub** | WebSockets (Fastify) + **Redis Pub/Sub** |
-| **Armazenamento de Operações** | MongoDB (`docOps`) + Document Updater Service | PostgreSQL (`document_operations`) |
+| **Armazenamento de Operações** | MongoDB (`docOps`) + Document Updater Service | PostgreSQL (`document_operations`) + Redis Buffer |
 | **Persistência de Snapshots** | Buffering em Redis/RAM $\to$ Debounce $\to$ DocStore/Disco | Buffering em Redis/RAM $\to$ Debounce 3s $\to$ PostgreSQL |
-| **Integração de Versões** | Histórico de Projetos + **Git Bridge** bidirecional | Tabela `document_snapshots` com versão incremental |
+| **Integração de Versões** | Histórico de Projetos + **Git Bridge** bidirecional | Tabela `document_snapshots` com versão semântica e histórico |
 
 ---
 

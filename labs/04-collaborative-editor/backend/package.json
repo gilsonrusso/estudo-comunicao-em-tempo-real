@@ -7,13 +7,15 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test 'src/**/*.test.ts'",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,json}\""
   },
   "dependencies": {
+    "@codemirror/collab": "^6.1.1",
+    "@codemirror/state": "^6.7.6",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^10.1.4",
     "@fastify/websocket": "^11.0.2",

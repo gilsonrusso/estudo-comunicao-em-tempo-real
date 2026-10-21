@@ -36,6 +36,21 @@ export const DocumentOperationSchema = z.object({
 
 export type DocumentOperation = z.infer<typeof DocumentOperationSchema>;
 
+export const CollabUpdateSchema = z.object({
+  clientID: z.string(),
+  changes: z.unknown(),
+});
+
+export type CollabUpdate = z.infer<typeof CollabUpdateSchema>;
+
+export const PushUpdatesSchema = z.object({
+  file: z.string().default('main.tex'),
+  version: z.number(),
+  updates: z.array(CollabUpdateSchema),
+});
+
+export type PushUpdates = z.infer<typeof PushUpdatesSchema>;
+
 export const DocumentSnapshotSchema = z.object({
   id: z.string(),
   documentId: z.string(),

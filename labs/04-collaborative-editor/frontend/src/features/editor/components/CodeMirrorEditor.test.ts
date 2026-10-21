@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Text } from '@codemirror/state';
+import { Text, EditorState } from '@codemirror/state';
 import {
   parseBibEntries,
   extractBibKeys,
@@ -15,6 +15,7 @@ import {
   themeCompart,
   spellcheckCompart,
   editorConfigCompart,
+  collabSyncFacet,
 } from './CodeMirrorEditor.js';
 
 describe('CodeMirrorEditor Unit Tests', () => {
@@ -151,14 +152,36 @@ l.3 \\badcommand
       expect(grammarLinterCompart).toBeDefined();
     });
 
-    it('should create valid spellcheck extension', () => {
-      const ext = getSpellcheckExtension(true, 'pt-BR');
-      expect(ext).toBeDefined();
+    it('should create valid spellcheck extension and deduplicate by reference', () => {
+      const ext1 = getSpellcheckExtension(true, 'pt-BR');
+      const ext2 = getSpellcheckExtension(true, 'pt-BR');
+      expect(ext1).toBeDefined();
+      expect(ext1).toBe(ext2);
     });
 
-    it('should create valid editor configuration extension', () => {
-      const ext = getEditorConfigExtension('15px', '1.9', true);
-      expect(ext).toBeDefined();
+    it('should create valid editor configuration extension and deduplicate by reference', () => {
+      const ext1 = getEditorConfigExtension('15px', '1.9', true);
+      const ext2 = getEditorConfigExtension('15px', '1.9', true);
+      expect(ext1).toBeDefined();
+      expect(ext1).toBe(ext2);
+    });
+
+    it('should provide and read collabSyncFacet config correctly in EditorState', () => {
+      const state = EditorState.create({
+        doc: 'test doc',
+        extensions: [
+          collabSyncFacet.of({
+            onPush: () => {},
+            isRemoteChange: () => false,
+            getClientId: () => 'user-1',
+            getActiveFile: () => 'main.tex',
+          }),
+        ],
+      });
+      const config = state.facet(collabSyncFacet);
+      expect(config).toBeDefined();
+      expect(config?.getClientId()).toBe('user-1');
+      expect(config?.getActiveFile()).toBe('main.tex');
     });
   });
 });
