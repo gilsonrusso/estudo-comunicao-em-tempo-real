@@ -18,20 +18,30 @@ import {
 } from '../../infra/minio.js';
 import { defaultTemplatesService } from '../templates/templates.service.js';
 import { parseLatexZip } from '../../utils/latex-zip-parser.js';
+import { Text, ChangeSet } from '@codemirror/state';
+import { Update, rebaseUpdates } from '@codemirror/collab';
 
 // Repositório conectado ao PostgreSQL
 export const defaultDocumentsRepository = new PostgresDocumentsRepository();
 
-interface ActiveDocState {
-  content: string;
+export interface ActiveFileCollab {
+  doc: Text;
   version: number;
+  updates: Update[];
+}
+
+export interface ActiveDocState {
+  content: string;
+  doc: Text;
+  version: number;
+  updates: Update[];
+  filesCollab: Map<string, ActiveFileCollab>;
   opSeq: number;
   pendingOps: number;
-  debounceTimer: NodeJS.Timeout | null;
+  debounceTimer?: NodeJS.Timeout;
   lastAuthor: string;
   onSnapshotSaved?: (snapshot: DocumentSnapshot) => void;
 }
-
 export class DocumentsService {
   private activeDocs: Map<string, ActiveDocState> = new Map();
   private commentsMap: Map<string, ReviewComment[]> = new Map();
@@ -96,22 +106,51 @@ export class DocumentsService {
     if (active) {
       return {
         ...doc,
-        content: active.content,
-        version: active.version,
+        content: active.doc.toString(),
+        version: active.updates.length,
       };
     }
 
-    // Carrega na memória ativa
+    // Carrega na memória ativa com representação Text do CodeMirror
+    const textDoc = Text.of(doc.content.split('\n'));
     this.activeDocs.set(id, {
       content: doc.content,
+      doc: textDoc,
       version: doc.version,
+      updates: [],
+      filesCollab: new Map(),
       opSeq: 0,
       pendingOps: 0,
-      debounceTimer: null,
+      debounceTimer: undefined,
       lastAuthor: 'Sistema',
     });
 
     return doc;
+  }
+
+  getCollabVersion(documentId: string, file = 'main.tex'): number {
+    const active = this.activeDocs.get(documentId);
+    if (!active) return 0;
+    if (file === 'main.tex') {
+      return active.updates.length;
+    }
+    const fileCollab = active.filesCollab.get(file);
+    return fileCollab ? fileCollab.updates.length : 0;
+  }
+
+  getUpdatesSince(
+    documentId: string,
+    file = 'main.tex',
+    sinceVersion = 0
+  ): Array<{ clientID: string; changes: unknown }> {
+    const active = this.activeDocs.get(documentId);
+    if (!active) return [];
+    const list = file === 'main.tex' ? active.updates : active.filesCollab.get(file)?.updates || [];
+    const clamped = Math.max(0, Math.min(sinceVersion, list.length));
+    return list.slice(clamped).map((u) => ({
+      clientID: u.clientID,
+      changes: u.changes.toJSON(),
+    }));
   }
 
   async listDocuments(): Promise<Document[]> {
@@ -237,7 +276,136 @@ export class DocumentsService {
   }
 
   /**
-   * Aplica um delta atômico no documento em tempo real
+   * Aplica e rebaseia atualizações colaborativas com @codemirror/collab
+   */
+  async pushUpdates(
+    documentId: string,
+    file: string,
+    clientVersion: number,
+    rawUpdates: Array<{ clientID: string; changes: unknown }>,
+    userId: string,
+    userName: string,
+    onSnapshotSaved?: (snapshot: DocumentSnapshot) => void
+  ): Promise<{
+    rebasedUpdates: Array<{ clientID: string; changes: unknown }>;
+    newVersion: number;
+    docContent: string;
+  }> {
+    let active = this.activeDocs.get(documentId);
+    if (!active) {
+      await this.getDocument(documentId);
+      active = this.activeDocs.get(documentId)!;
+    }
+
+    if (onSnapshotSaved) {
+      active.onSnapshotSaved = onSnapshotSaved;
+    }
+
+    const isMain = file === 'main.tex';
+    let targetDoc: Text;
+    let targetUpdates: Update[];
+
+    if (isMain) {
+      targetDoc = active.doc;
+      targetUpdates = active.updates;
+    } else {
+      let fileCollab = active.filesCollab.get(file);
+      if (!fileCollab) {
+        const projectFiles = await this.listProjectFiles(documentId);
+        const targetFileObj = projectFiles.find((f) => f.path === file);
+        const initialContent = targetFileObj?.content || '';
+        fileCollab = {
+          doc: Text.of(initialContent.split('\n')),
+          version: 0,
+          updates: [],
+        };
+        active.filesCollab.set(file, fileCollab);
+      }
+      targetDoc = fileCollab.doc;
+      targetUpdates = fileCollab.updates;
+    }
+    if (!rawUpdates.length) {
+      return {
+        rebasedUpdates: [],
+        newVersion: targetUpdates.length,
+        docContent: targetDoc.toString(),
+      };
+    }
+
+
+    let received: Update[] = rawUpdates.map((u) => ({
+      clientID: u.clientID,
+      changes: ChangeSet.fromJSON(u.changes),
+    }));
+
+    // Rebase se o cliente estiver defasado em relação à versão canônica do servidor
+    if (clientVersion < targetUpdates.length) {
+      const historicalUpdates = targetUpdates.slice(clientVersion);
+      received = [...rebaseUpdates(received, historicalUpdates)];
+    }
+
+    const comments = this.commentsMap.get(documentId);
+    for (const update of received) {
+      targetUpdates.push(update);
+      targetDoc = update.changes.apply(targetDoc);
+      active.pendingOps++;
+      active.lastAuthor = userName;
+
+      if (isMain && comments) {
+        for (const comment of comments) {
+          if (comment.file === file) {
+            comment.from = update.changes.mapPos(comment.from, 1);
+            comment.to = update.changes.mapPos(comment.to, -1);
+          }
+        }
+      }
+    }
+
+    let finalContent = '';
+    if (isMain) {
+      active.doc = targetDoc;
+      finalContent = targetDoc.toString();
+      active.content = finalContent;
+    } else {
+      const fileCollab = active.filesCollab.get(file)!;
+      fileCollab.doc = targetDoc;
+      fileCollab.version = targetUpdates.length;
+      finalContent = targetDoc.toString();
+    }
+
+    if (redisPubClient.isOpen) {
+      for (const update of received) {
+        await redisPubClient.rPush(
+          `collab:doc:${documentId}:ops`,
+          JSON.stringify({
+            clientID: update.clientID,
+            changes: update.changes.toJSON(),
+            userId,
+            userName,
+            file,
+            timestamp: Date.now(),
+          })
+        );
+      }
+    }
+
+    clearTimeout(active.debounceTimer);
+    active.debounceTimer = setTimeout(async () => {
+      await this.flushCheckpoint(documentId);
+    }, 3000);
+
+    return {
+      rebasedUpdates: received.map((u) => ({
+        clientID: u.clientID,
+        changes: u.changes.toJSON(),
+      })),
+      newVersion: targetUpdates.length,
+      docContent: finalContent,
+    };
+  }
+
+  /**
+   * Aplica um delta atômico no documento em tempo real (compatibilidade legada)
    */
   async applyDelta(
     documentId: string,
@@ -246,31 +414,31 @@ export class DocumentsService {
   ): Promise<{ operation: DocumentOperation; newContent: string; newVersion: number }> {
     let active = this.activeDocs.get(documentId);
     if (!active) {
-      // Carrega do banco se não estiver em memória
-      const doc = await this.getDocument(documentId);
+      await this.getDocument(documentId);
       active = this.activeDocs.get(documentId)!;
     }
 
-    if (onSnapshotSaved) {
-      active.onSnapshotSaved = onSnapshotSaved;
-    }
-
-    // 1. Aplicação do Delta no texto em memória (Operação atômica)
-    const pos = Math.max(0, Math.min(delta.position, active.content.length));
+    const pos = Math.max(0, Math.min(delta.position, active.doc.length));
+    let change: ChangeSet;
     if (delta.type === 'insert' && delta.text !== undefined) {
-      active.content = active.content.slice(0, pos) + delta.text + active.content.slice(pos);
+      change = ChangeSet.of([{ from: pos, insert: delta.text }], active.doc.length);
     } else if (delta.type === 'delete' && delta.length !== undefined) {
-      active.content = active.content.slice(0, pos) + active.content.slice(pos + delta.length);
+      const delLen = Math.min(delta.length, active.doc.length - pos);
+      change = ChangeSet.of([{ from: pos, to: pos + delLen }], active.doc.length);
+    } else {
+      change = ChangeSet.empty(active.doc.length);
     }
 
-    active.opSeq++;
-    active.pendingOps++;
-    active.lastAuthor = delta.userName;
+    const result = await this.pushUpdates(
+      documentId,
+      'main.tex',
+      active.updates.length,
+      [{ clientID: delta.userId, changes: change.toJSON() }],
+      delta.userId,
+      delta.userName,
+      onSnapshotSaved
+    );
 
-    // Ajusta as posições dos comentários inline com base no delta aplicado
-    this.adjustCommentPositions(documentId, 'main.tex', delta);
-
-    // 2. Registra a operação no PostgreSQL (append-only) e no buffer do Redis
     const op: DocumentOperation = {
       id: randomUUID(),
       documentId,
@@ -284,24 +452,10 @@ export class DocumentsService {
     };
     await this.repository.appendOperation(op);
 
-    // Buffer rápido no Redis
-    if (redisPubClient.isOpen) {
-      await redisPubClient.rPush(`collab:doc:${documentId}:ops`, JSON.stringify(op));
-    }
-
-    // 3. Estratégia de Debounce: agenda gravação de Snapshot no PostgreSQL a cada 3s de inatividade
-    if (active.debounceTimer) {
-      clearTimeout(active.debounceTimer);
-    }
-
-    active.debounceTimer = setTimeout(async () => {
-      await this.flushCheckpoint(documentId);
-    }, 3000);
-
     return {
       operation: op,
-      newContent: active.content,
-      newVersion: active.version,
+      newContent: result.docContent,
+      newVersion: result.newVersion,
     };
   }
 
@@ -312,22 +466,33 @@ export class DocumentsService {
     const active = this.activeDocs.get(documentId);
     if (!active || active.pendingOps === 0) return null;
 
-    // Incrementa a versão semântica de revisão do histórico
     active.version++;
+    const content = active.doc.toString();
+    active.content = content;
 
     console.log(
       `[PostgreSQL] 💾 Persistindo Checkpoint Snapshot do documento ${documentId} (Versão ${active.version})...`
     );
 
-    // Atualiza o documento no banco relacional PostgreSQL
-    await this.repository.updateContent(documentId, active.content, active.version);
+    await this.repository.updateContent(documentId, content, active.version);
 
-    // Cria o registro imutável do Snapshot
+    for (const [filePath, fileState] of active.filesCollab.entries()) {
+      try {
+        const projectFiles = await this.listProjectFiles(documentId);
+        const pf = projectFiles.find((f) => f.path === filePath);
+        if (pf) {
+          await this.repository.updateProjectFileContent(pf.id, fileState.doc.toString());
+        }
+      } catch (err) {
+        console.error(`[Flush] Erro ao persistir arquivo secundário ${filePath}:`, err);
+      }
+    }
+
     const snapshot: DocumentSnapshot = {
       id: randomUUID(),
       documentId,
       version: active.version,
-      content: active.content,
+      content,
       savedBy: active.lastAuthor,
       reason: `checkpoint_${active.pendingOps}_operacoes`,
       createdAt: new Date().toISOString(),
@@ -335,9 +500,8 @@ export class DocumentsService {
 
     await this.repository.createSnapshot(snapshot);
     active.pendingOps = 0;
-    active.debounceTimer = null;
+    active.debounceTimer = undefined;
 
-    // Limpa o buffer de deltas consolidado no Redis
     if (redisPubClient.isOpen) {
       await redisPubClient.del(`collab:doc:${documentId}:ops`);
     }
