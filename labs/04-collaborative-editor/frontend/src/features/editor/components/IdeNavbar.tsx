@@ -21,8 +21,8 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
 import { CollaboratorsBar } from './CollaboratorsBar';
+import { EditorHistoryControls } from './EditorHistoryControls';
 import { Collaborator, RemoteCursor, SaveStatus } from '../types/collab.types';
-
 export interface IdeNavbarProps {
   projectTitle: string;
   userName: string;
@@ -44,6 +44,12 @@ export interface IdeNavbarProps {
   onUserNameChange: (name: string) => void;
   onManualFlush: () => void;
   onRecompile?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  undoCount?: number;
+  redoCount?: number;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export function IdeNavbar({
@@ -67,6 +73,12 @@ export function IdeNavbar({
   onUserNameChange,
   onManualFlush,
   onRecompile,
+  canUndo = false,
+  canRedo = false,
+  undoCount,
+  redoCount,
+  onUndo,
+  onRedo,
 }: IdeNavbarProps) {
   // Estados dos menus dropdown
   const [fileMenuAnchor, setFileMenuAnchor] = useState<null | HTMLElement>(null);
@@ -227,10 +239,24 @@ export function IdeNavbar({
             onClose={() => handleCloseMenu(setEditMenuAnchor)}
             sx={{ '& .MuiPaper-root': { fontSize: '0.8rem', minWidth: 160 } }}
           >
-            <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>
+            <MenuItem
+              disabled={!canUndo}
+              onClick={() => {
+                onUndo?.();
+                handleCloseMenu(setEditMenuAnchor);
+              }}
+            >
               Desfazer (Ctrl+Z)
             </MenuItem>
-            <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>Refazer (Ctrl+Y)</MenuItem>
+            <MenuItem
+              disabled={!canRedo}
+              onClick={() => {
+                onRedo?.();
+                handleCloseMenu(setEditMenuAnchor);
+              }}
+            >
+              Refazer (Ctrl+Y)
+            </MenuItem>
             <Divider />
             <MenuItem onClick={() => handleCloseMenu(setEditMenuAnchor)}>
               Localizar (Ctrl+F)
@@ -284,6 +310,15 @@ export function IdeNavbar({
               Apenas PDF
             </MenuItem>
           </Menu>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 16, alignSelf: 'center' }} />
+          <EditorHistoryControls
+            canUndo={canUndo}
+            canRedo={canRedo}
+            undoCount={undoCount}
+            redoCount={redoCount}
+            onUndo={onUndo || (() => {})}
+            onRedo={onRedo || (() => {})}
+          />
         </Stack>
       </Stack>
 

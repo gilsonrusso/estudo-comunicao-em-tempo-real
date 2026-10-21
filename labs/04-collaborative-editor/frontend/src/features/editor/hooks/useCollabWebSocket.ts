@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { WS_BASE } from '../../../constants/api.constants';
 import {
   Collaborator,
+  CollabUpdateJSON,
   DeltaOperation,
   DocumentData,
   DocumentSnapshot,
@@ -15,10 +16,12 @@ export interface UseCollabWebSocketProps {
   userName: string;
   activeFile: string;
   onRemoteDelta: (delta: DeltaOperation, file: string, version: number) => void;
+  onRemoteCollabUpdates?: (file: string, version: number, updates: CollabUpdateJSON[]) => void;
   onSyncInit: (
     document: DocumentData,
     collaborators: Collaborator[],
-    comments?: ReviewComment[]
+    comments?: ReviewComment[],
+    collabVersion?: number
   ) => void;
   onSnapshotSaved: (snapshot: DocumentSnapshot, time: string) => void;
   onCommentAdded?: (comment: ReviewComment) => void;
@@ -32,6 +35,7 @@ export function useCollabWebSocket({
   userName,
   activeFile,
   onRemoteDelta,
+  onRemoteCollabUpdates,
   onSyncInit,
   onSnapshotSaved,
   onCommentAdded,
@@ -65,8 +69,26 @@ export function useCollabWebSocket({
         switch (msg.type) {
           case 'SYNC_INIT':
             setCollaborators(msg.collaborators);
-            onSyncInit(msg.document, msg.collaborators, msg.comments);
+            onSyncInit(msg.document, msg.collaborators, msg.comments, msg.version);
             break;
+
+          case 'PULL_UPDATES_RESPONSE': {
+            const targetFile: string = msg.file || 'main.tex';
+            const updates: CollabUpdateJSON[] = msg.updates || [];
+            onRemoteCollabUpdates?.(targetFile, msg.version, updates);
+            if (msg.author && msg.author.userId !== userId && targetFile === activeFile) {
+              setActiveEditor({
+                userName: msg.author.userName,
+                color: msg.author.color,
+                action: `digitou em ${targetFile}`,
+              });
+              clearTimeout(activeEditorTimeoutRef.current ?? undefined);
+              activeEditorTimeoutRef.current = setTimeout(() => {
+                setActiveEditor(null);
+              }, 2500);
+            }
+            break;
+          }
 
           case 'COLLABORATOR_JOINED':
           case 'COLLABORATOR_LEFT':
@@ -127,7 +149,7 @@ export function useCollabWebSocket({
                   action:
                     op.type === 'insert' ? `digitou em ${targetFile}` : `apagou em ${targetFile}`,
                 });
-                if (activeEditorTimeoutRef.current) clearTimeout(activeEditorTimeoutRef.current);
+                clearTimeout(activeEditorTimeoutRef.current ?? undefined);
                 activeEditorTimeoutRef.current = setTimeout(() => {
                   setActiveEditor(null);
                 }, 2500);
@@ -171,6 +193,7 @@ export function useCollabWebSocket({
     userName,
     activeFile,
     onRemoteDelta,
+    onRemoteCollabUpdates,
     onSyncInit,
     onSnapshotSaved,
     onCommentAdded,
@@ -192,6 +215,22 @@ export function useCollabWebSocket({
     },
     []
   );
+  const sendCollabUpdates = useCallback(
+    (file: string, version: number, updates: CollabUpdateJSON[]) => {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(
+          JSON.stringify({
+            type: 'PUSH_UPDATES',
+            file,
+            version,
+            updates,
+          })
+        );
+      }
+    },
+    []
+  );
+
 
   const sendCursorMove = useCallback(
     (position: number, file: string, selectionStart?: number, selectionEnd?: number) => {
@@ -222,6 +261,7 @@ export function useCollabWebSocket({
     remoteCursors,
     activeEditor,
     sendDelta,
+    sendCollabUpdates,
     sendCursorMove,
     sendRawMessage,
   };

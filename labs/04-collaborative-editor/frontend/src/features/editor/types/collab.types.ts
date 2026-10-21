@@ -27,6 +27,17 @@ export interface DeltaOperation {
   timestamp: number;
 }
 
+export interface CollabUpdateJSON {
+  clientID: string;
+  changes: unknown;
+}
+
+export interface CollabPushPayload {
+  file: string;
+  version: number;
+  updates: CollabUpdateJSON[];
+}
+
 export interface DocumentSnapshot {
   id: string;
   documentId: string;

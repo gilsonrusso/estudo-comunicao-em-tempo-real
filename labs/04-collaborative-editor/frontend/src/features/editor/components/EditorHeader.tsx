@@ -29,6 +29,9 @@ export function EditorHeader() {
     setUserName,
     handleManualFlush,
     recompile,
+    historyStatus,
+    handleUndo,
+    handleRedo,
   } = useCollabEditor();
 
   return (
@@ -72,6 +75,12 @@ export function EditorHeader() {
           onUserNameChange={setUserName}
           onManualFlush={handleManualFlush}
           onRecompile={recompile}
+          canUndo={historyStatus.canUndo}
+          canRedo={historyStatus.canRedo}
+          undoCount={historyStatus.undoDepth}
+          redoCount={historyStatus.redoDepth}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
         />
       </Box>
     </Box>
