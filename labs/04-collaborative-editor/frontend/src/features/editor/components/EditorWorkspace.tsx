@@ -12,6 +12,8 @@ import { PdfPreview } from './PdfPreview';
 import { HistorySidebar } from './HistorySidebar';
 import { ReviewSidebar } from './ReviewSidebar';
 import { SettingsModal } from './SettingsModal';
+import { EditorDiffViewer } from './EditorDiffViewer';
+import { DocumentSnapshot } from '../types/collab.types';
 import { ResizableSplitLayout } from '../../../components/common/ResizableSplitLayout';
 import { API_BASE } from '../../../constants/api.constants';
 
@@ -22,12 +24,17 @@ export function EditorWorkspace() {
     documentData,
     userId,
     userName,
+    collabVersion,
+    incomingCollabUpdates,
+    handlePushCollabUpdates,
+    handleDocContentChange,
     collaborators,
     activeFileRemoteCursors,
     activeEditor,
     saveStatus,
     lastSavedAt,
     isConnected,
+    isSynced,
     snapshots,
     operations,
     activeFile,
@@ -62,6 +69,8 @@ export function EditorWorkspace() {
     handleDeleteComment,
     handleManualFlush,
     isFlushing,
+    setHistoryStatus,
+    registerEditorActions,
   } = useCollabEditor();
 
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<ActiveSidebarPanel>('files');
@@ -72,8 +81,9 @@ export function EditorWorkspace() {
     to: number;
     selectedText: string;
   } | null>(null);
+  const [diffSnapshot, setDiffSnapshot] = useState<DocumentSnapshot | null>(null);
 
-  if (!documentData) {
+  if (!documentData || !isSynced) {
     return (
       <Box
         sx={{
@@ -85,7 +95,7 @@ export function EditorWorkspace() {
           color: 'text.secondary',
         }}
       >
-        <Typography variant="body2">Conectando ao documento e carregando deltas...</Typography>
+        <Typography variant="body2">Sincronizando documento colaborativo...</Typography>
       </Box>
     );
   }
@@ -225,6 +235,12 @@ export function EditorWorkspace() {
                     key={activeFile}
                     content={currentEditorContent}
                     version={documentData.version}
+                    collabVersion={collabVersion}
+                    currentUserId={userId}
+                    activeFile={activeFile}
+                    onPushCollabUpdates={handlePushCollabUpdates}
+                    incomingCollabUpdates={incomingCollabUpdates}
+                    onDocContentChange={handleDocContentChange}
                     saveStatus={isMainFile ? saveStatus : 'synced'}
                     lastSavedAt={lastSavedAt}
                     remoteCursors={activeFileRemoteCursors}
@@ -248,6 +264,8 @@ export function EditorWorkspace() {
                         handleSecondaryDelta(delta);
                       }
                     }}
+                    onHistoryChange={setHistoryStatus}
+                    onRegisterActions={registerEditorActions}
                   />
                 </Box>
               </Box>
@@ -285,6 +303,7 @@ export function EditorWorkspace() {
           operations={operations}
           onManualFlush={handleManualFlush}
           isFlushing={isFlushing}
+          onCompareSnapshot={setDiffSnapshot}
         />
       )}
 
@@ -294,6 +313,32 @@ export function EditorWorkspace() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={updateSettings}
+      />
+      <EditorDiffViewer
+        open={Boolean(diffSnapshot)}
+        snapshot={diffSnapshot}
+        currentContent={currentEditorContent}
+        themeMode={themeMode}
+        onClose={() => setDiffSnapshot(null)}
+        onRestoreVersion={(snap) => {
+          if (isMainFile) {
+            handleApplyLocalDelta({
+              type: 'insert',
+              position: 0,
+              text: snap.content,
+              length: currentEditorContent.length,
+            });
+            handleDocContentChange(snap.content);
+          } else {
+            handleSecondaryDelta({
+              type: 'insert',
+              position: 0,
+              text: snap.content,
+              length: currentEditorContent.length,
+            });
+          }
+          setDiffSnapshot(null);
+        }}
       />
     </Box>
   );
